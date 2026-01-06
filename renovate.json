@@ -3,6 +3,9 @@
   "extends": [
     "config:recommended"
   ],
+  "pip_requirements": {
+    "fileMatch": ["tools/.+/requirements\\.txt$"]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -11,15 +14,6 @@
       ],
       "matchStrings": [
         "//\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n\\s*(?:const\\s+)?(?:version|Version)\\s*(?:=|:=)\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
-      ]
-    },
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/requirements\\.txt$/"
-      ],
-      "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>[^\\s]+)\\s+depName=(?<depName>[^\\s]+)\\n(?<depNameShort>[^=]+)==(?<currentValue>[^\\s]+)"
       ]
     }
   ]
