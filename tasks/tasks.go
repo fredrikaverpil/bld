@@ -30,7 +30,12 @@ type Tasks struct {
 func New(cfg bld.Config) *Tasks {
 	cfg = cfg.WithDefaults()
 	t := &Tasks{}
-	var deps goyek.Deps
+
+	// Generate runs first - other tasks may need generated files
+	t.Generate = generate.Task(cfg)
+
+	// Start with generate as first dep (runs before everything else)
+	deps := goyek.Deps{t.Generate}
 
 	// Create Go tasks if configured
 	if cfg.Go != nil {
@@ -49,10 +54,6 @@ func New(cfg bld.Config) *Tasks {
 	//     t.Python = python.NewTasks(cfg)
 	//     deps = append(deps, t.Python.All)
 	// }
-
-	// Always create generate task
-	t.Generate = generate.Task(cfg)
-	deps = append(deps, t.Generate)
 
 	// Create the "all" task that runs everything
 	t.All = goyek.Define(goyek.Task{
