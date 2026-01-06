@@ -41,11 +41,6 @@ Examples:
 }
 
 func runInit() error {
-	// Check we're in a Go module
-	if _, err := os.Stat("go.mod"); err != nil {
-		return fmt.Errorf("not in a Go module (no go.mod found)")
-	}
-
 	// Check .bld doesn't already exist
 	if _, err := os.Stat(".bld"); err == nil {
 		return fmt.Errorf(".bld/ already exists")
