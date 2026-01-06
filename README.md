@@ -1,11 +1,11 @@
 # bld
 
+An opinonated, cross-platform, build system for git projects, powered by
+[goyek](https://github.com/goyek/goyek).
+
 > [!WARNING]
 >
 > Under heavy development. Breaking changes will occur.
-
-A cross-platform build system for Go projects, powered by
-[goyek](https://github.com/goyek/goyek).
 
 ## Features
 
@@ -14,9 +14,7 @@ A cross-platform build system for Go projects, powered by
 - **CI workflow generation**: Generates GitHub Actions workflows from templates
 - **Simple invocation**: Just `go run ./.bld <task>`
 
-## Quick Start
-
-### Bootstrap a new project
+## Bootstrap a new project
 
 Run the init command in your project root (must have a `go.mod`):
 
@@ -50,7 +48,7 @@ alias bld='./bld'
 
 Then run tasks with just `bld go-fmt`.
 
-## Configuration
+### Configuration
 
 ```go
 bld.Config{
@@ -84,17 +82,7 @@ Task skips in `GoModuleOptions` affect both local execution and CI:
 - If all modules skip format → no format job in CI workflow
 - `go-fmt` task only runs on modules where `SkipFormat: false`
 
-## Generated Workflows
-
-Running `go run ./.bld update` generates:
-
-- `bld-go.yml` - Go CI (format check, tests)
-- `bld-pr.yml` - Semantic PR title validation
-- `bld-stale.yml` - Stale issue/PR management
-- `bld-release.yml` - Release-please automation
-- `bld-sync.yml` - Monthly bld update PRs
-
-## Project Structure
+### Project Structure
 
 ```
 your-project/
@@ -107,23 +95,15 @@ your-project/
 └── ...
 ```
 
-## Terminology
+### Releases
 
-### Tools
+The GitHub release workflow requires the following repository settings:
 
-- Binaries we download in `.bld/tools/` and install to `.bld/bin/`
-- Examples: golangci-lint, buf, mdformat, uv, stylua
-- Have versions, download URLs, Renovate comments
-- Expose a (hidden) `Prepare` task and helper functions
+- Actions → General → Workflow Permissions:
+  - [x] **Read and write permissions**
+  - [x] **Allow GitHub Actions to create and approve pull requests**
 
-### Tasks (goyek tasks)
-
-- What projects execute: `go-fmt`, `go-lint`, `go-test`
-- May use tools: `go-lint` → uses golangci-lint tool
-- May use system binaries: `go-fmt` → uses system go
-- Defined in `tasks/`
-
-## Adding Custom Tasks
+### Adding Custom Tasks
 
 Add tasks directly in `.bld/main.go`. Custom tasks are preserved when running
 `./bld update`.
@@ -173,7 +153,7 @@ func main() {
 
 Run custom tasks with `./bld generate`.
 
-## Adding Custom Tools
+### Adding Custom Tools
 
 Create a tool in your `.bld/tools/` directory:
 
@@ -216,17 +196,7 @@ func Run(ctx context.Context, args ...string) error {
 }
 ```
 
-## Project repo settings
-
-### Releases
-
-The GitHub release workflow requires the following repository settings:
-
-- Actions → General → Workflow Permissions:
-  - [x] **Read and write permissions**
-  - [x] **Allow GitHub Actions to create and approve pull requests**
-
-## Windows
+### A note on Windows
 
 The `./bld` wrapper script requires a bash-compatible shell. On Windows, use one
 of:
@@ -242,6 +212,18 @@ Alternatively, create a `bld.cmd` wrapper:
 go run -C .bld . %*
 ```
 
-## License
+## Terminology
 
-MIT
+### Tools
+
+- Binaries we download in `.bld/tools/` and install to `.bld/bin/`
+- Examples: golangci-lint, buf, mdformat, uv, stylua
+- Have versions, download URLs, Renovate comments
+- Expose a (hidden) `Prepare` task and helper functions
+
+### Tasks (goyek tasks)
+
+- What projects execute: `go-fmt`, `go-lint`, `go-test`
+- May use tools: `go-lint` → uses golangci-lint tool
+- May use system binaries: `go-fmt` → uses system go
+- Defined in `tasks/`
