@@ -31,11 +31,10 @@ This creates:
 
 ```bash
 ./bld            # run all tasks (lint, format, test)
-./bld go-fmt     # format Go code (gofumpt, goimports, gci, golines)
-./bld go-lint    # run golangci-lint
-./bld go-test    # run tests
 ./bld update     # generate CI workflows
 ```
+
+Run `./bld -h` for a list of all possible tasks to run.
 
 ### Shell alias (optional)
 
@@ -46,7 +45,7 @@ For even shorter commands, add an alias to your shell profile:
 alias bld='./bld'
 ```
 
-Then run tasks with just `bld go-fmt`.
+Then run tasks with just `bld <task>`.
 
 ### Configuration
 

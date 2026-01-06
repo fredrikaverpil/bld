@@ -122,8 +122,8 @@ func NewTasks(cfg bld.Config) *Tasks {
 	})
 
 	t.All = goyek.Define(goyek.Task{
-		Name:  "all",
-		Usage: "run all Go tasks (lint, format, test, vulncheck)",
+		Name:  "go-all",
+		Usage: "run all Go tasks (format, lint, test, vulncheck)",
 		Deps:  goyek.Deps{t.Format, t.Lint, t.Test, t.Vulncheck},
 	})
 

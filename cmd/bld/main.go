@@ -55,12 +55,6 @@ func runInit() error {
 		return fmt.Errorf("not in a Go module (no go.mod found): %w", err)
 	}
 
-	// Get Go version from root go.mod
-	goVersion, err := bld.ExtractGoVersion(".")
-	if err != nil {
-		return fmt.Errorf("reading Go version: %w", err)
-	}
-
 	// Check .bld doesn't already exist
 	if _, err := os.Stat(".bld"); err == nil {
 		return fmt.Errorf(".bld/ already exists")
@@ -119,16 +113,15 @@ func runInit() error {
 
 	// Create wrapper script
 	fmt.Println("  Creating ./bld (wrapper script)")
-	if err := os.WriteFile("bld", []byte(wrapperScript(goVersion)), 0o755); err != nil {
+	if err := bld.GenerateShim(); err != nil {
 		return fmt.Errorf("creating bld wrapper: %w", err)
 	}
 
 	fmt.Println()
 	fmt.Println("Done! You can now run:")
 	fmt.Println("  ./bld -h          # list available tasks")
-	fmt.Println("  ./bld go-fmt      # format Go code")
-	fmt.Println("  ./bld go-test     # run tests")
-	fmt.Println("  ./bld update      # generate CI workflows")
+	fmt.Println("  ./bld             # run all tasks (format, lint, test, vulncheck, generate)")
+	fmt.Println("  ./bld update      # update bld to latest version")
 
 	return nil
 }
@@ -156,20 +149,10 @@ func runCommand(dir, name string, args ...string) error {
 	return cmd.Run()
 }
 
-func wrapperScript(goVersion string) string {
-	return fmt.Sprintf(wrapperBashTemplate, goVersion)
-}
-
 func runUpdate() error {
 	// Check .bld exists
 	if _, err := os.Stat(".bld"); os.IsNotExist(err) {
 		return fmt.Errorf(".bld/ not found - run 'bld init' first")
-	}
-
-	// Get Go version from .bld/go.mod
-	goVersion, err := bld.ExtractGoVersion(".bld")
-	if err != nil {
-		return fmt.Errorf("reading Go version: %w", err)
 	}
 
 	fmt.Println("Updating bld...")
@@ -186,13 +169,7 @@ func runUpdate() error {
 		return fmt.Errorf("go mod tidy: %w", err)
 	}
 
-	// Update wrapper script
-	fmt.Println("  Updating ./bld (wrapper script)")
-	if err := os.WriteFile("bld", []byte(wrapperScript(goVersion)), 0o755); err != nil {
-		return fmt.Errorf("updating bld wrapper: %w", err)
-	}
-
-	fmt.Println("Done!")
+	fmt.Println("Done! Run './bld generate' to regenerate shim and workflows.")
 	return nil
 }
 
@@ -217,19 +194,30 @@ import (
 	"os/exec"
 
 	"github.com/fredrikaverpil/bld"
+	"github.com/fredrikaverpil/bld/tasks/generate"
 	"github.com/fredrikaverpil/bld/tasks/golang"
-	"github.com/fredrikaverpil/bld/workflows"
 	"github.com/goyek/goyek/v3"
 	"github.com/goyek/x/boot"
 )
 
-var tasks = golang.NewTasks(Config)
+// Register tasks
+var (
+	goTasks     = golang.NewTasks(Config)
+	generateAll = generate.Task(Config)
+)
 
-var update = goyek.Define(goyek.Task{
+// All runs all tasks
+var all = goyek.Define(goyek.Task{
+	Name:  "all",
+	Usage: "run all tasks",
+	Deps:  goyek.Deps{goTasks.All, generateAll},
+})
+
+// Update updates bld dependency
+var _ = goyek.Define(goyek.Task{
 	Name:  "update",
-	Usage: "update bld and generate CI workflows",
+	Usage: "update bld dependency",
 	Action: func(a *goyek.A) {
-		// Update bld dependency and wrapper script
 		cmd := exec.CommandContext(a.Context(), "go", "run", "github.com/fredrikaverpil/bld/cmd/bld@latest", "update")
 		cmd.Dir = bld.FromGitRoot()
 		cmd.Stdout = os.Stdout
@@ -237,17 +225,11 @@ var update = goyek.Define(goyek.Task{
 		if err := cmd.Run(); err != nil {
 			a.Fatalf("bld update: %v", err)
 		}
-
-		// Generate workflows
-		if err := workflows.Generate(Config); err != nil {
-			a.Fatal(err)
-		}
-		a.Log("Generated workflows in .github/workflows/")
 	},
 })
 
 func main() {
-	goyek.SetDefault(tasks.All)
+	goyek.SetDefault(all)
 	boot.Main()
 }
 `
@@ -255,34 +237,4 @@ func main() {
 const gitignoreTemplate = `# Downloaded tool binaries
 bin/
 tools/
-`
-
-const wrapperBashTemplate = `#!/bin/bash
-set -e
-
-BLD_DIR=".bld"
-GO_VERSION="%s"
-GO_INSTALL_DIR="$BLD_DIR/tools/go/$GO_VERSION"
-GO_BIN="$GO_INSTALL_DIR/go/bin/go"
-
-# Find Go binary
-if command -v go &> /dev/null; then
-    GO_CMD="go"
-elif [[ -x "$GO_BIN" ]]; then
-    GO_CMD="$GO_BIN"
-else
-    # Download Go
-    echo "Go not found, downloading go$GO_VERSION..."
-    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
-    ARCH=$(uname -m)
-    [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
-    [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]] && ARCH="arm64"
-
-    mkdir -p "$GO_INSTALL_DIR"
-    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.${OS}-${ARCH}.tar.gz" | tar -xz -C "$GO_INSTALL_DIR"
-    GO_CMD="$GO_BIN"
-    echo "Go $GO_VERSION installed to $GO_INSTALL_DIR"
-fi
-
-"$GO_CMD" run -C "$BLD_DIR" . -v "$@"
 `

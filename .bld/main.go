@@ -5,21 +5,30 @@ import (
 	"os/exec"
 
 	"github.com/fredrikaverpil/bld"
+	"github.com/fredrikaverpil/bld/tasks/generate"
 	"github.com/fredrikaverpil/bld/tasks/golang"
-	"github.com/fredrikaverpil/bld/workflows"
 	"github.com/goyek/goyek/v3"
 	"github.com/goyek/x/boot"
 )
 
-// Register Go tasks
-var tasks = golang.NewTasks(Config)
+// Register tasks
+var (
+	goTasks     = golang.NewTasks(Config)
+	generateAll = generate.Task(Config)
+)
 
-// Update updates bld and generates CI workflows
-var update = goyek.Define(goyek.Task{
+// All runs all tasks
+var all = goyek.Define(goyek.Task{
+	Name:  "all",
+	Usage: "run all tasks",
+	Deps:  goyek.Deps{goTasks.All, generateAll},
+})
+
+// Update updates bld dependency
+var _ = goyek.Define(goyek.Task{
 	Name:  "update",
-	Usage: "update bld and generate CI workflows",
+	Usage: "update bld dependency",
 	Action: func(a *goyek.A) {
-		// Update bld dependency and wrapper script
 		cmd := exec.CommandContext(a.Context(), "go", "run", "github.com/fredrikaverpil/bld/cmd/bld@latest", "update")
 		cmd.Dir = bld.FromGitRoot()
 		cmd.Stdout = os.Stdout
@@ -27,28 +36,10 @@ var update = goyek.Define(goyek.Task{
 		if err := cmd.Run(); err != nil {
 			a.Fatalf("bld update: %v", err)
 		}
-
-		// Generate workflows
-		if err := workflows.Generate(Config); err != nil {
-			a.Fatal(err)
-		}
-		a.Log("Generated workflows in .github/workflows/")
-	},
-})
-
-// Dogfood generates workflows using local bld code (for development)
-var dogfood = goyek.Define(goyek.Task{
-	Name:  "dogfood",
-	Usage: "generate CI workflows using local bld (for development)",
-	Action: func(a *goyek.A) {
-		if err := workflows.Generate(Config); err != nil {
-			a.Fatal(err)
-		}
-		a.Log("Generated workflows in .github/workflows/")
 	},
 })
 
 func main() {
-	goyek.SetDefault(tasks.All)
+	goyek.SetDefault(all)
 	boot.Main()
 }
