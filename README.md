@@ -121,18 +121,32 @@ Alternatively, create a `bld.cmd` wrapper:
 go run -C .bld . %*
 ```
 
+## Adding a New Ecosystem
+
+To add support for a new language/ecosystem (e.g., Python, Lua):
+
+1. **Create tools** in `tools/<toolname>/tool.go`
+   - Export `Prepare(ctx) error`, `Command(ctx, args) *Cmd`,
+     `Run(ctx, args) error`
+   - Add Renovate comment for version updates
+2. **Create tasks** in `tasks/<ecosystem>/tasks.go`
+   - Define goyek tasks that use the tools
+   - Call `tool.Prepare()` before `tool.Command()`, or just use `tool.Run()`
+3. **Add tool tests** in `tools/tools_test.go`
+   - Add one line to the `tools` table
+4. **Wire up in config** - add config options in `config.go` if needed
+
 ## Terminology
 
 ### Tools
 
-- Binaries we download in `.bld/tools/` and install to `.bld/bin/`
-- Examples: golangci-lint, buf, mdformat, uv, stylua
+- Binaries downloaded to `.bld/tools/` and symlinked to `.bld/bin/`
+- Examples: golangci-lint, govulncheck, mdformat, uv
 - Have versions, download URLs, Renovate comments
-- Expose a (hidden) `Prepare` task and helper functions
+- Expose `Prepare()`, `Command()`, `Run()` functions
 
 ### Tasks (goyek tasks)
 
-- What projects execute: `go-fmt`, `go-lint`, `go-test`
-- May use tools: `go-lint` → uses golangci-lint tool
-- May use system binaries: `go-fmt` → uses system go
+- What users execute: `go-fmt`, `go-lint`, `go-test`
+- Use tools via their Go API
 - Defined in `tasks/`
