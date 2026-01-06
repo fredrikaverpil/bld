@@ -7,6 +7,7 @@ import (
 	"github.com/fredrikaverpil/bld/tasks/generate"
 	"github.com/fredrikaverpil/bld/tasks/golang"
 	"github.com/fredrikaverpil/bld/tasks/markdown"
+	"github.com/fredrikaverpil/bld/tasks/update"
 	"github.com/goyek/goyek/v3"
 )
 
@@ -23,6 +24,9 @@ type Tasks struct {
 
 	// Generate regenerates all generated files.
 	Generate *goyek.DefinedTask
+
+	// Update updates bld and regenerates files.
+	Update *goyek.DefinedTask
 }
 
 // New creates tasks based on the provided Config.
@@ -33,6 +37,9 @@ func New(cfg bld.Config) *Tasks {
 
 	// Generate runs first - other tasks may need generated files
 	t.Generate = generate.Task(cfg)
+
+	// Update is standalone (not part of "all")
+	t.Update = update.Task(cfg)
 
 	// Start with generate as first dep (runs before everything else)
 	deps := goyek.Deps{t.Generate}
