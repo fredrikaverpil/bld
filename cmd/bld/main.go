@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/fredrikaverpil/bld"
+	"github.com/fredrikaverpil/bld/internal/shim"
 )
 
 func main() {
@@ -113,7 +113,7 @@ func runInit() error {
 
 	// Create wrapper script
 	fmt.Println("  Creating ./bld (wrapper script)")
-	if err := bld.GenerateShim(); err != nil {
+	if err := shim.Generate(); err != nil {
 		return fmt.Errorf("creating bld wrapper: %w", err)
 	}
 

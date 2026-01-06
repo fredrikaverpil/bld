@@ -1,26 +1,29 @@
-package bld
+// Package shim provides generation of the ./bld wrapper script.
+package shim
 
 import (
 	"fmt"
 	"os"
+
+	"github.com/fredrikaverpil/bld"
 )
 
-// GenerateShim creates or updates the ./bld wrapper script.
-func GenerateShim() error {
-	goVersion, err := ExtractGoVersion(DirName)
+// Generate creates or updates the ./bld wrapper script.
+func Generate() error {
+	goVersion, err := bld.ExtractGoVersion(bld.DirName)
 	if err != nil {
 		return fmt.Errorf("reading Go version: %w", err)
 	}
 
-	shimPath := FromGitRoot("bld")
-	if err := os.WriteFile(shimPath, []byte(shimScript(goVersion)), 0o755); err != nil {
+	shimPath := bld.FromGitRoot("bld")
+	if err := os.WriteFile(shimPath, []byte(script(goVersion)), 0o755); err != nil {
 		return fmt.Errorf("writing bld shim: %w", err)
 	}
 
 	return nil
 }
 
-func shimScript(goVersion string) string {
+func script(goVersion string) string {
 	return fmt.Sprintf(`#!/bin/bash
 set -e
 

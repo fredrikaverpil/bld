@@ -3,7 +3,8 @@ package generate
 
 import (
 	"github.com/fredrikaverpil/bld"
-	"github.com/fredrikaverpil/bld/workflows"
+	"github.com/fredrikaverpil/bld/internal/shim"
+	"github.com/fredrikaverpil/bld/internal/workflows"
 	"github.com/goyek/goyek/v3"
 )
 
@@ -13,7 +14,7 @@ func Task(cfg bld.Config) *goyek.DefinedTask {
 		Name:  "generate",
 		Usage: "regenerate all generated files (shim, workflows)",
 		Action: func(a *goyek.A) {
-			if err := bld.GenerateShim(); err != nil {
+			if err := shim.Generate(); err != nil {
 				a.Fatal(err)
 			}
 			a.Log("Generated ./bld shim")

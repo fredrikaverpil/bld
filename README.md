@@ -115,17 +115,17 @@ import (
     "os/exec"
 
     "github.com/fredrikaverpil/bld"
-    "github.com/fredrikaverpil/bld/tasks/golang"
-    "github.com/fredrikaverpil/bld/workflows"
+    "github.com/fredrikaverpil/bld/tasks"
     "github.com/goyek/goyek/v3"
     "github.com/goyek/x/boot"
 )
 
-var tasks = golang.NewTasks(Config)
+// All built-in tasks are created based on Config.
+var t = tasks.New(Config)
 
-// Custom task example
-var generate = goyek.Define(goyek.Task{
-    Name:  "generate",
+// Custom task example: add your own tasks alongside the built-in ones.
+var myGenerate = goyek.Define(goyek.Task{
+    Name:  "my-generate",
     Usage: "run go generate",
     Action: func(a *goyek.A) {
         cmd := exec.CommandContext(a.Context(), "go", "generate", "./...")
@@ -136,16 +136,8 @@ var generate = goyek.Define(goyek.Task{
     },
 })
 
-var update = goyek.Define(goyek.Task{
-    Name:  "update",
-    Usage: "update bld and generate CI workflows",
-    Action: func(a *goyek.A) {
-        // ... existing update task
-    },
-})
-
 func main() {
-    goyek.SetDefault(tasks.All)
+    goyek.SetDefault(t.All)
     boot.Main()
 }
 ```
