@@ -3,9 +3,6 @@
   "extends": [
     "config:recommended"
   ],
-  "pip_requirements": {
-    "fileMatch": ["tools/.+/requirements\\.txt$"]
-  },
   "customManagers": [
     {
       "customType": "regex",
