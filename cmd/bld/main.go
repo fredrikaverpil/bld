@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/fredrikaverpil/bld"
 )
 
 func main() {
@@ -51,6 +53,12 @@ func runInit() error {
 	moduleName, err := getModuleName()
 	if err != nil {
 		return fmt.Errorf("not in a Go module (no go.mod found): %w", err)
+	}
+
+	// Get Go version from root go.mod
+	goVersion, err := bld.ExtractGoVersion(".")
+	if err != nil {
+		return fmt.Errorf("reading Go version: %w", err)
 	}
 
 	// Check .bld doesn't already exist
@@ -111,7 +119,7 @@ func runInit() error {
 
 	// Create wrapper script
 	fmt.Println("  Creating ./bld (wrapper script)")
-	if err := os.WriteFile("bld", []byte(wrapperBashTemplate), 0o755); err != nil {
+	if err := os.WriteFile("bld", []byte(wrapperScript(goVersion)), 0o755); err != nil {
 		return fmt.Errorf("creating bld wrapper: %w", err)
 	}
 
@@ -148,10 +156,20 @@ func runCommand(dir, name string, args ...string) error {
 	return cmd.Run()
 }
 
+func wrapperScript(goVersion string) string {
+	return fmt.Sprintf(wrapperBashTemplate, goVersion)
+}
+
 func runUpdate() error {
 	// Check .bld exists
 	if _, err := os.Stat(".bld"); os.IsNotExist(err) {
 		return fmt.Errorf(".bld/ not found - run 'bld init' first")
+	}
+
+	// Get Go version from .bld/go.mod
+	goVersion, err := bld.ExtractGoVersion(".bld")
+	if err != nil {
+		return fmt.Errorf("reading Go version: %w", err)
 	}
 
 	fmt.Println("Updating bld...")
@@ -170,7 +188,7 @@ func runUpdate() error {
 
 	// Update wrapper script
 	fmt.Println("  Updating ./bld (wrapper script)")
-	if err := os.WriteFile("bld", []byte(wrapperBashTemplate), 0o755); err != nil {
+	if err := os.WriteFile("bld", []byte(wrapperScript(goVersion)), 0o755); err != nil {
 		return fmt.Errorf("updating bld wrapper: %w", err)
 	}
 
@@ -241,5 +259,30 @@ tools/
 
 const wrapperBashTemplate = `#!/bin/bash
 set -e
-go run -C .bld . -v "$@"
+
+BLD_DIR=".bld"
+GO_VERSION="%s"
+GO_INSTALL_DIR="$BLD_DIR/tools/go/$GO_VERSION"
+GO_BIN="$GO_INSTALL_DIR/go/bin/go"
+
+# Find Go binary
+if command -v go &> /dev/null; then
+    GO_CMD="go"
+elif [[ -x "$GO_BIN" ]]; then
+    GO_CMD="$GO_BIN"
+else
+    # Download Go
+    echo "Go not found, downloading go$GO_VERSION..."
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
+    [[ "$ARCH" == "x86_64" ]] && ARCH="amd64"
+    [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]] && ARCH="arm64"
+
+    mkdir -p "$GO_INSTALL_DIR"
+    curl -fsSL "https://go.dev/dl/go${GO_VERSION}.${OS}-${ARCH}.tar.gz" | tar -xz -C "$GO_INSTALL_DIR"
+    GO_CMD="$GO_BIN"
+    echo "Go $GO_VERSION installed to $GO_INSTALL_DIR"
+fi
+
+"$GO_CMD" run -C "$BLD_DIR" . -v "$@"
 `
