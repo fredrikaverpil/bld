@@ -2,6 +2,7 @@
 set -e
 
 BLD_DIR=".bld"
+BLD_CONTEXT="."
 GO_VERSION="1.25.5"
 GO_INSTALL_DIR="$BLD_DIR/tools/go/$GO_VERSION"
 GO_BIN="$GO_INSTALL_DIR/go/bin/go"
@@ -40,4 +41,4 @@ if [[ "$found_separator" == "false" ]]; then
     args+=("-v")
 fi
 
-"$GO_CMD" run -C "$BLD_DIR" . "${args[@]}"
+BLD_CONTEXT="$BLD_CONTEXT" "$GO_CMD" run -C "$BLD_DIR" . "${args[@]}"

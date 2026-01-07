@@ -129,12 +129,12 @@ To add support for a new language/ecosystem (e.g., Python, Lua):
    - Export `Prepare(ctx) error`, `Command(ctx, args) *Cmd`,
      `Run(ctx, args) error`
    - Add Renovate comment for version updates
-2. **Create tasks** in `tasks/<ecosystem>/tasks.go`
+1. **Create tasks** in `tasks/<ecosystem>/tasks.go`
    - Define goyek tasks that use the tools
    - Call `tool.Prepare()` before `tool.Command()`, or just use `tool.Run()`
-3. **Add tool tests** in `tools/tools_test.go`
+1. **Add tool tests** in `tools/tools_test.go`
    - Add one line to the `tools` table
-4. **Wire up in config** - add config options in `config.go` if needed
+1. **Wire up in config** - add config options in `config.go` if needed
 
 ## Terminology
 

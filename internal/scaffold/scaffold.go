@@ -54,12 +54,17 @@ func GenerateAll(cfg *bld.Config) error {
 		return err
 	}
 
-	// Always regenerate shim
-	if err := shim.Generate(); err != nil {
+	// Always regenerate shim(s).
+	// Use provided config or a minimal default for initial scaffold.
+	shimCfg := bld.Config{}
+	if cfg != nil {
+		shimCfg = *cfg
+	}
+	if err := shim.Generate(shimCfg); err != nil {
 		return err
 	}
 
-	// Generate workflows if config provided
+	// Generate workflows if config provided.
 	if cfg != nil {
 		if err := workflows.Generate(*cfg); err != nil {
 			return err

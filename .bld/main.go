@@ -4,15 +4,26 @@
 package main
 
 import (
+	"os"
+
 	"github.com/fredrikaverpil/bld/tasks"
 	"github.com/goyek/goyek/v3"
 	"github.com/goyek/x/boot"
 )
 
-// All tasks are automatically created based on Config.
-var t = tasks.New(Config)
-
 func main() {
+	// Get the context from the shim (defaults to root).
+	context := os.Getenv("BLD_CONTEXT")
+	if context == "" {
+		context = "."
+	}
+
+	// Filter config to only include tasks for this context.
+	cfg := Config.ForContext(context)
+
+	// Create tasks based on filtered config.
+	t := tasks.New(cfg)
+
 	goyek.SetDefault(t.All)
 	boot.Main()
 }

@@ -1,5 +1,7 @@
 package bld
 
+import "sort"
+
 // Config defines the configuration for a project using bld.
 type Config struct {
 	// Language configurations
@@ -179,4 +181,82 @@ func (c Config) GoModulesForVulncheck() []string {
 		}
 	}
 	return paths
+}
+
+// UniqueModulePaths returns all unique directory paths across all language configs.
+// The paths are sorted and always include "." for the root context.
+func (c Config) UniqueModulePaths() []string {
+	seen := make(map[string]bool)
+	seen["."] = true // Always include root.
+
+	if c.Go != nil {
+		for path := range c.Go.Modules {
+			seen[path] = true
+		}
+	}
+	if c.Lua != nil {
+		for path := range c.Lua.Modules {
+			seen[path] = true
+		}
+	}
+	if c.Markdown != nil {
+		for path := range c.Markdown.Modules {
+			seen[path] = true
+		}
+	}
+
+	paths := make([]string, 0, len(seen))
+	for path := range seen {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// ForContext returns a filtered config containing only modules for the given path.
+// For the root context ("."), returns the full config unchanged.
+// GitHub config is always preserved as it applies globally.
+func (c Config) ForContext(context string) Config {
+	if context == "." {
+		return c
+	}
+
+	filtered := Config{
+		GitHub: c.GitHub, // Always preserve GitHub config.
+	}
+
+	// Filter Go modules.
+	if c.Go != nil {
+		if opts, ok := c.Go.Modules[context]; ok {
+			filtered.Go = &GoConfig{
+				Modules: map[string]GoModuleOptions{
+					context: opts,
+				},
+			}
+		}
+	}
+
+	// Filter Lua modules.
+	if c.Lua != nil {
+		if opts, ok := c.Lua.Modules[context]; ok {
+			filtered.Lua = &LuaConfig{
+				Modules: map[string]LuaModuleOptions{
+					context: opts,
+				},
+			}
+		}
+	}
+
+	// Filter Markdown modules.
+	if c.Markdown != nil {
+		if opts, ok := c.Markdown.Modules[context]; ok {
+			filtered.Markdown = &MarkdownConfig{
+				Modules: map[string]MarkdownModuleOptions{
+					context: opts,
+				},
+			}
+		}
+	}
+
+	return filtered
 }
