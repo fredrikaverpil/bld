@@ -10,10 +10,9 @@ An opinonated, cross-platform, build system for git projects, powered by
 ## Features
 
 - **Cross-platform**: No Makefiles - works on Windows, macOS, and Linux
-- **Task management**: Defines tasks like `go-test`, `python-lint`...
+- **Task management**: Defines tasks like `go-test`, `go-lint`...
 - **Tool management**: Downloads and caches tools in `.bld/`, which are used by
   tasks
-- **CI workflow generation**: Generates GitHub Actions workflows from templates
 - **Simple invocation**: Just `./bld <task>` or `./bld -h` to list all tasks
 
 ## Bootstrap a new project
@@ -27,14 +26,14 @@ go run github.com/fredrikaverpil/bld/cmd/bld@latest init
 This creates:
 
 - `.bld/` - build module with config and tasks
-- `./bld` - wrapper script
+- `./bld` - wrapper script (or `bld.cmd`/`bld.ps1` on Windows)
 
 ### Run tasks
 
 ```bash
 ./bld            # run all tasks (generate, lint, format, test)
 ./bld update     # update bld to latest version
-./bld generate   # regenerate shim and CI workflows
+./bld generate   # regenerate shim
 ```
 
 Run `./bld -h` for a list of all possible tasks to run.
@@ -62,26 +61,11 @@ bld.Config{
             "generated":  {SkipLint: true},           // skip lint for generated code
         },
     },
-
-    // GitHub Actions configuration (nil = no GitHub workflows)
-    GitHub: &bld.GitHubConfig{
-        // Go versions are automatically extracted from each module's go.mod.
-        // Add extra versions to test against (e.g., "stable", "oldstable", pre-releases).
-        ExtraGoVersions: []string{"stable"},
-        OSVersions:      []string{"ubuntu-latest"},  // default
-
-        // Skip generic workflows
-        SkipPR:      false,  // semantic PR validation
-        SkipStale:   false,  // stale issue/PR management
-        SkipRelease: false,  // release-please
-        SkipSync:    false,  // auto-sync bld updates
-    },
 }
 ```
 
-Task skips in `GoModuleOptions` affect both local execution and CI:
+Task skips in `GoModuleOptions` control which tasks run on each module:
 
-- If all modules skip format → no format job in CI workflow
 - `go-fmt` task only runs on modules where `SkipFormat: false`
 
 ### Project Structure
@@ -92,8 +76,7 @@ your-project/
 │   ├── main.go      # generated (do not edit)
 │   ├── config.go    # project config (edit this)
 │   └── go.mod
-├── .github/workflows/
-│   └── bld-*.yml    # generated
+├── bld              # wrapper script (platform-specific)
 └── ...
 ```
 
@@ -141,19 +124,14 @@ Custom: map[string][]goyek.Task{
 See [goyek documentation](https://github.com/goyek/goyek) for more task options
 like dependencies, parallel execution, and error handling.
 
-### Releases
-
-The GitHub release workflow requires the following repository settings:
-
-- Actions → General → Workflow Permissions:
-  - [x] **Read and write permissions**
-  - [x] **Allow GitHub Actions to create and approve pull requests**
-
 ### Windows Support
 
-By default, bld generates a Posix-compatible `./bld` script that works with
-bash. For native Windows support, you can enable Windows shims in your
-`.bld/config.go`:
+When bootstrapping, bld automatically detects your platform:
+
+- **Unix/macOS/WSL**: Creates `./bld` (Posix bash script)
+- **Windows**: Creates `bld.cmd` and `bld.ps1`
+
+To add additional shim types after bootstrapping, update your `.bld/config.go`:
 
 ```go
 var Config = bld.Config{
@@ -191,7 +169,6 @@ rem PowerShell
 
 - Git Bash (included with Git for Windows) - use `./bld` directly
 - WSL (Windows Subsystem for Linux) - use `./bld` directly
-- GitHub Actions - uses `shell: bash` automatically in generated workflows
 
 ## Adding a New Ecosystem
 
