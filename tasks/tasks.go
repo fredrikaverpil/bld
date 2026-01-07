@@ -5,6 +5,7 @@ package tasks
 import (
 	"github.com/fredrikaverpil/bld"
 	"github.com/fredrikaverpil/bld/tasks/generate"
+	"github.com/fredrikaverpil/bld/tasks/gitdiff"
 	"github.com/fredrikaverpil/bld/tasks/golang"
 	"github.com/fredrikaverpil/bld/tasks/lua"
 	"github.com/fredrikaverpil/bld/tasks/markdown"
@@ -31,6 +32,9 @@ type Tasks struct {
 
 	// Update updates bld and regenerates files.
 	Update *goyek.DefinedTask
+
+	// GitDiff fails if there are uncommitted changes.
+	GitDiff *goyek.DefinedTask
 
 	// Custom holds custom tasks registered for this context.
 	Custom []*goyek.DefinedTask
@@ -83,12 +87,25 @@ func New(cfg bld.Config) *Tasks {
 		deps = append(deps, defined)
 	}
 
-	// Create the "all" task that runs everything.
-	t.All = goyek.Define(goyek.Task{
+	// GitDiff is available as a standalone task.
+	t.GitDiff = gitdiff.Task()
+
+	// Create the "all" task that runs everything, then checks for uncommitted changes.
+	allTask := goyek.Task{
 		Name:  "all",
 		Usage: "run all tasks",
 		Deps:  deps,
-	})
+	}
+	if !cfg.SkipGitDiff {
+		allTask.Action = func(a *goyek.A) {
+			// Run git diff after all deps complete.
+			cmd := bld.Command(a.Context(), "git", "diff", "--exit-code")
+			if err := cmd.Run(); err != nil {
+				a.Fatal("uncommitted changes detected; please commit or stage your changes")
+			}
+		}
+	}
+	t.All = goyek.Define(allTask)
 
 	return t
 }

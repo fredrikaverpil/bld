@@ -12,6 +12,11 @@ type Config struct {
 	// Default: "bld"
 	ShimName string
 
+	// SkipGitDiff disables the git diff check at the end of the "all" task.
+	// By default, "all" fails if there are uncommitted changes after running all tasks.
+	// Set to true to disable this check.
+	SkipGitDiff bool
+
 	// Language configurations
 	Go  *GoConfig
 	Lua *LuaConfig
@@ -257,8 +262,9 @@ func (c Config) ForContext(context string) Config {
 	}
 
 	filtered := Config{
-		ShimName: c.ShimName, // Preserve shim name.
-		GitHub:   c.GitHub,   // Always preserve GitHub config.
+		ShimName:    c.ShimName,    // Preserve shim name.
+		SkipGitDiff: c.SkipGitDiff, // Preserve git diff setting.
+		GitHub:      c.GitHub,      // Always preserve GitHub config.
 	}
 
 	// Filter Go modules.
