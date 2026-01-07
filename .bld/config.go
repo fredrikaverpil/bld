@@ -24,8 +24,4 @@ var Config = bld.Config{
 			".": {},
 		},
 	},
-	GitHub: &bld.GitHubConfig{
-		OSVersions: []string{"ubuntu-latest", "windows-latest"},
-		SkipSync:   true, // This is the bld repo itself, no need to sync
-	},
 }
