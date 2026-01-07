@@ -66,7 +66,7 @@ pocket.Config{
 
 ### Custom Tasks
 
-Add your own tasks in `.pocket/config.go`:
+Add your own tasks in `.pocket/mytask.go`:
 
 ```go
 import (
