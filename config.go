@@ -24,9 +24,6 @@ type Config struct {
 	// Documentation
 	Markdown *MarkdownConfig
 
-	// CI platforms
-	GitHub *GitHubConfig
-
 	// Custom maps folder paths to custom goyek tasks.
 	// Use "." for the root context.
 	// Tasks are included in the "all" task and shown in help output.
@@ -97,24 +94,6 @@ type LuaModuleOptions struct {
 	SkipFormat bool
 }
 
-// GitHubConfig defines GitHub Actions workflow configuration.
-type GitHubConfig struct {
-	// ExtraGoVersions specifies additional Go versions to test against,
-	// beyond the versions extracted from go.mod files.
-	// Uses setup-go syntax: "stable", "oldstable", or specific versions like "1.22".
-	ExtraGoVersions []string
-
-	// OSVersions specifies runner OS versions.
-	// Default: ["ubuntu-latest"]
-	OSVersions []string
-
-	// Skip flags for generic workflows
-	SkipPR      bool
-	SkipStale   bool
-	SkipRelease bool
-	SkipSync    bool
-}
-
 // WithDefaults returns a copy of the config with default values applied.
 func (c Config) WithDefaults() Config {
 	// Default to Posix shim only if no Shim config is provided.
@@ -128,13 +107,6 @@ func (c Config) WithDefaults() Config {
 	}
 	c.Shim = &shim
 
-	if c.GitHub != nil {
-		gh := *c.GitHub
-		if len(gh.OSVersions) == 0 {
-			gh.OSVersions = []string{"ubuntu-latest"}
-		}
-		c.GitHub = &gh
-	}
 	return c
 }
 
@@ -282,7 +254,6 @@ func (c Config) UniqueModulePaths() []string {
 
 // ForContext returns a filtered config containing only modules for the given path.
 // For the root context ("."), returns the full config unchanged.
-// GitHub config is always preserved as it applies globally.
 func (c Config) ForContext(context string) Config {
 	if context == "." {
 		return c
@@ -291,7 +262,6 @@ func (c Config) ForContext(context string) Config {
 	filtered := Config{
 		Shim:        c.Shim,        // Preserve shim config.
 		SkipGitDiff: c.SkipGitDiff, // Preserve git diff setting.
-		GitHub:      c.GitHub,      // Always preserve GitHub config.
 	}
 
 	// Filter Go modules.

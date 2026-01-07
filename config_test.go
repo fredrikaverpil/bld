@@ -170,9 +170,6 @@ func TestConfig_ForContext(t *testing.T) {
 			".":      nil,
 			"deploy": nil,
 		},
-		GitHub: &GitHubConfig{
-			OSVersions: []string{"ubuntu-latest"},
-		},
 	}
 
 	tests := []struct {
@@ -182,7 +179,6 @@ func TestConfig_ForContext(t *testing.T) {
 		wantHasLua bool
 		wantHasMd  bool
 		wantCustom bool
-		wantGitHub bool // GitHub should always be preserved.
 	}{
 		{
 			name:       "root context returns full config",
@@ -191,7 +187,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: true,
 			wantHasMd:  true,
 			wantCustom: true,
-			wantGitHub: true,
 		},
 		{
 			name:       "tests context has only Go",
@@ -200,7 +195,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: false,
 			wantHasMd:  false,
 			wantCustom: false,
-			wantGitHub: true,
 		},
 		{
 			name:       "scripts context has only Lua",
@@ -209,7 +203,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: true,
 			wantHasMd:  false,
 			wantCustom: false,
-			wantGitHub: true,
 		},
 		{
 			name:       "docs context has only Markdown",
@@ -218,7 +211,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: false,
 			wantHasMd:  true,
 			wantCustom: false,
-			wantGitHub: true,
 		},
 		{
 			name:       "deploy context has only Custom",
@@ -227,7 +219,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: false,
 			wantHasMd:  false,
 			wantCustom: true,
-			wantGitHub: true,
 		},
 		{
 			name:       "non-existent context",
@@ -236,7 +227,6 @@ func TestConfig_ForContext(t *testing.T) {
 			wantHasLua: false,
 			wantHasMd:  false,
 			wantCustom: false,
-			wantGitHub: true,
 		},
 	}
 
@@ -252,11 +242,6 @@ func TestConfig_ForContext(t *testing.T) {
 					gotName = got.Shim.Name
 				}
 				t.Errorf("ForContext(%q).Shim.Name = %q, want %q", tt.context, gotName, baseConfig.Shim.Name)
-			}
-
-			// Verify GitHub is always preserved.
-			if tt.wantGitHub && got.GitHub == nil {
-				t.Errorf("ForContext(%q).GitHub = nil, want non-nil", tt.context)
 			}
 
 			// Verify Go config.
@@ -328,54 +313,28 @@ func TestConfig_WithDefaults(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name           string
-		config         Config
-		wantShimName   string
-		wantOSVersions []string
+		name         string
+		config       Config
+		wantShimName string
 	}{
 		{
-			name:           "empty config gets default shim name",
-			config:         Config{},
-			wantShimName:   "bld",
-			wantOSVersions: nil, // No GitHub config.
+			name:         "empty config gets default shim name",
+			config:       Config{},
+			wantShimName: "bld",
 		},
 		{
 			name: "custom shim name is preserved",
 			config: Config{
 				Shim: &ShimConfig{Name: "build", Posix: true},
 			},
-			wantShimName:   "build",
-			wantOSVersions: nil,
-		},
-		{
-			name: "github config gets default OS versions",
-			config: Config{
-				GitHub: &GitHubConfig{},
-			},
-			wantShimName:   "bld",
-			wantOSVersions: []string{"ubuntu-latest"},
-		},
-		{
-			name: "custom OS versions are preserved",
-			config: Config{
-				GitHub: &GitHubConfig{
-					OSVersions: []string{"ubuntu-22.04", "macos-latest"},
-				},
-			},
-			wantShimName:   "bld",
-			wantOSVersions: []string{"ubuntu-22.04", "macos-latest"},
+			wantShimName: "build",
 		},
 		{
 			name: "all custom values are preserved",
 			config: Config{
 				Shim: &ShimConfig{Name: "mybld", Posix: true},
-				GitHub: &GitHubConfig{
-					OSVersions: []string{"windows-latest"},
-					SkipPR:     true,
-				},
 			},
-			wantShimName:   "mybld",
-			wantOSVersions: []string{"windows-latest"},
+			wantShimName: "mybld",
 		},
 	}
 
@@ -390,18 +349,6 @@ func TestConfig_WithDefaults(t *testing.T) {
 					gotName = got.Shim.Name
 				}
 				t.Errorf("WithDefaults().Shim.Name = %q, want %q", gotName, tt.wantShimName)
-			}
-
-			if tt.wantOSVersions == nil {
-				if got.GitHub != nil {
-					t.Errorf("WithDefaults().GitHub = %v, want nil", got.GitHub)
-				}
-			} else {
-				if got.GitHub == nil {
-					t.Error("WithDefaults().GitHub = nil, want non-nil")
-				} else if !reflect.DeepEqual(got.GitHub.OSVersions, tt.wantOSVersions) {
-					t.Errorf("WithDefaults().GitHub.OSVersions = %v, want %v", got.GitHub.OSVersions, tt.wantOSVersions)
-				}
 			}
 		})
 	}

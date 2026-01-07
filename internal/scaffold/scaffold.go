@@ -9,7 +9,6 @@ import (
 
 	"github.com/fredrikaverpil/bld"
 	"github.com/fredrikaverpil/bld/internal/shim"
-	"github.com/fredrikaverpil/bld/internal/workflows"
 )
 
 //go:embed main.go.tmpl
@@ -24,7 +23,6 @@ var GitignoreTemplate []byte
 // GenerateAll regenerates all generated files.
 // Creates one-time files (config.go, .gitignore) if they don't exist.
 // Always regenerates main.go and shim.
-// If cfg is not nil, also generates workflows.
 func GenerateAll(cfg *bld.Config) error {
 	bldDir := filepath.Join(bld.FromGitRoot(), bld.DirName)
 
@@ -62,13 +60,6 @@ func GenerateAll(cfg *bld.Config) error {
 	}
 	if err := shim.Generate(shimCfg); err != nil {
 		return err
-	}
-
-	// Generate workflows if config provided.
-	if cfg != nil {
-		if err := workflows.Generate(*cfg); err != nil {
-			return err
-		}
 	}
 
 	return nil

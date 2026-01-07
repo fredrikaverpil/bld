@@ -11,12 +11,12 @@ import (
 func Task(cfg bld.Config) *goyek.DefinedTask {
 	return goyek.Define(goyek.Task{
 		Name:  "generate",
-		Usage: "regenerate all generated files (main.go, shim, workflows)",
+		Usage: "regenerate all generated files (main.go, shim)",
 		Action: func(a *goyek.A) {
 			if err := scaffold.GenerateAll(&cfg); err != nil {
 				a.Fatal(err)
 			}
-			a.Log("Generated .bld/main.go, ./bld shim, and workflows")
+			a.Log("Generated .bld/main.go and shim")
 		},
 	})
 }

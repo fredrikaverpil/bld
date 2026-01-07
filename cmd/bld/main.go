@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 
+	"github.com/fredrikaverpil/bld"
 	"github.com/fredrikaverpil/bld/internal/scaffold"
 )
 
@@ -73,9 +75,16 @@ func runInit() error {
 	}
 
 	// Generate all scaffold files (config.go, .gitignore, main.go, shim)
-	// No config = no workflows
+	// Detect platform and generate appropriate shim(s)
 	fmt.Println("  Generating scaffold files")
-	if err := scaffold.GenerateAll(nil); err != nil {
+	cfg := &bld.Config{
+		Shim: &bld.ShimConfig{
+			Posix:      runtime.GOOS != "windows",
+			Windows:    runtime.GOOS == "windows",
+			PowerShell: runtime.GOOS == "windows",
+		},
+	}
+	if err := scaffold.GenerateAll(cfg); err != nil {
 		return fmt.Errorf("generating scaffold: %w", err)
 	}
 
@@ -87,9 +96,15 @@ func runInit() error {
 
 	fmt.Println()
 	fmt.Println("Done! You can now run:")
-	fmt.Println("  ./bld -h          # list available tasks")
-	fmt.Println("  ./bld             # run all tasks")
-	fmt.Println("  ./bld update      # update bld to latest version")
+	if runtime.GOOS == "windows" {
+		fmt.Println("  .\\bld -h          # list available tasks")
+		fmt.Println("  .\\bld             # run all tasks")
+		fmt.Println("  .\\bld update      # update bld to latest version")
+	} else {
+		fmt.Println("  ./bld -h          # list available tasks")
+		fmt.Println("  ./bld             # run all tasks")
+		fmt.Println("  ./bld update      # update bld to latest version")
+	}
 
 	return nil
 }
