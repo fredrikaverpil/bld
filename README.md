@@ -201,3 +201,9 @@ To add support for a new language/ecosystem (e.g., Python, Lua):
 - What users execute: `go-fmt`, `go-lint`, `go-test`
 - Use tools via their Go API
 - Defined in `tasks/`
+
+## Acknowledgements
+
+- [goyek](https://github.com/goyek/goyek) - Powers the task system
+- [einride/sage](https://github.com/einride/sage) - Inspiration for the tool
+  management approach
