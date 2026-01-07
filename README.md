@@ -17,7 +17,7 @@ An opinonated build system platform, powered by
 
 ## Bootstrap a new project
 
-Run the init command in your project root (must have a `go.mod`):
+Run the init command in your project root:
 
 ```bash
 go run github.com/fredrikaverpil/pocket/cmd/pocket@latest init
