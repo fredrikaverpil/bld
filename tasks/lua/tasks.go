@@ -27,8 +27,19 @@ func NewTasks(cfg bld.Config) *Tasks {
 		Name:  "lua-format",
 		Usage: "format Lua files",
 		Action: func(a *goyek.A) {
-			if err := stylua.Run(a.Context(), "."); err != nil {
-				a.Fatal(err)
+			modules := cfg.LuaModulesForFormat()
+			if len(modules) == 0 {
+				a.Log("no modules configured for format")
+				return
+			}
+			configPath, err := stylua.ConfigPath()
+			if err != nil {
+				a.Fatalf("get stylua config: %v", err)
+			}
+			for _, mod := range modules {
+				if err := stylua.Run(a.Context(), "-f", configPath, mod); err != nil {
+					a.Errorf("stylua format failed in %s: %v", mod, err)
+				}
 			}
 		},
 	})
