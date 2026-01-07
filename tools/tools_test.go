@@ -7,6 +7,7 @@ import (
 	"github.com/fredrikaverpil/bld/tools/golangcilint"
 	"github.com/fredrikaverpil/bld/tools/govulncheck"
 	"github.com/fredrikaverpil/bld/tools/mdformat"
+	"github.com/fredrikaverpil/bld/tools/stylua"
 	"github.com/fredrikaverpil/bld/tools/uv"
 )
 
@@ -20,6 +21,7 @@ var tools = []struct {
 	{"govulncheck", govulncheck.Prepare, govulncheck.Run, []string{"-version"}},
 	{"uv", uv.Prepare, uv.Run, []string{"--version"}},
 	{"mdformat", mdformat.Prepare, mdformat.Run, []string{"--version"}},
+	{"stylua", stylua.Prepare, stylua.Run, []string{"--version"}},
 }
 
 func TestTools(t *testing.T) {

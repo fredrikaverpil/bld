@@ -6,6 +6,7 @@ import (
 	"github.com/fredrikaverpil/bld"
 	"github.com/fredrikaverpil/bld/tasks/generate"
 	"github.com/fredrikaverpil/bld/tasks/golang"
+	"github.com/fredrikaverpil/bld/tasks/lua"
 	"github.com/fredrikaverpil/bld/tasks/markdown"
 	"github.com/fredrikaverpil/bld/tasks/update"
 	"github.com/goyek/goyek/v3"
@@ -18,6 +19,9 @@ type Tasks struct {
 
 	// Go holds Go-specific tasks (nil if Config.Go is nil).
 	Go *golang.Tasks
+
+	// Lua holds Lua-specific tasks (nil if Config.Lua is nil).
+	Lua *lua.Tasks
 
 	// Markdown holds Markdown-specific tasks (nil if Config.Markdown is nil).
 	Markdown *markdown.Tasks
@@ -50,13 +54,19 @@ func New(cfg bld.Config) *Tasks {
 		deps = append(deps, t.Go.All)
 	}
 
+	// Create Lua tasks if configured
+	if cfg.Lua != nil {
+		t.Lua = lua.NewTasks(cfg)
+		// Note: Not added to "all" yet, use "lua-fmt" explicitly
+	}
+
 	// Create Markdown tasks if configured
 	if cfg.Markdown != nil {
 		t.Markdown = markdown.NewTasks(cfg)
 		deps = append(deps, t.Markdown.All)
 	}
 
-	// Future: Python, Lua, etc.
+	// Future: Python, etc.
 	// if cfg.Python != nil {
 	//     t.Python = python.NewTasks(cfg)
 	//     deps = append(deps, t.Python.All)
