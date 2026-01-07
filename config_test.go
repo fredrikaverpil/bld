@@ -146,7 +146,7 @@ func TestConfig_ForContext(t *testing.T) {
 	t.Parallel()
 
 	baseConfig := Config{
-		ShimName: "mybld",
+		Shim: &ShimConfig{Name: "mybld", Posix: true},
 		Go: &GoConfig{
 			Modules: map[string]GoModuleOptions{
 				".":     {SkipFormat: false},
@@ -245,9 +245,13 @@ func TestConfig_ForContext(t *testing.T) {
 			t.Parallel()
 			got := baseConfig.ForContext(tt.context)
 
-			// Verify ShimName is preserved.
-			if got.ShimName != baseConfig.ShimName {
-				t.Errorf("ForContext(%q).ShimName = %q, want %q", tt.context, got.ShimName, baseConfig.ShimName)
+			// Verify Shim config is preserved.
+			if got.Shim == nil || got.Shim.Name != baseConfig.Shim.Name {
+				gotName := ""
+				if got.Shim != nil {
+					gotName = got.Shim.Name
+				}
+				t.Errorf("ForContext(%q).Shim.Name = %q, want %q", tt.context, gotName, baseConfig.Shim.Name)
 			}
 
 			// Verify GitHub is always preserved.
@@ -338,7 +342,7 @@ func TestConfig_WithDefaults(t *testing.T) {
 		{
 			name: "custom shim name is preserved",
 			config: Config{
-				ShimName: "build",
+				Shim: &ShimConfig{Name: "build", Posix: true},
 			},
 			wantShimName:   "build",
 			wantOSVersions: nil,
@@ -364,7 +368,7 @@ func TestConfig_WithDefaults(t *testing.T) {
 		{
 			name: "all custom values are preserved",
 			config: Config{
-				ShimName: "mybld",
+				Shim: &ShimConfig{Name: "mybld", Posix: true},
 				GitHub: &GitHubConfig{
 					OSVersions: []string{"windows-latest"},
 					SkipPR:     true,
@@ -380,8 +384,12 @@ func TestConfig_WithDefaults(t *testing.T) {
 			t.Parallel()
 			got := tt.config.WithDefaults()
 
-			if got.ShimName != tt.wantShimName {
-				t.Errorf("WithDefaults().ShimName = %q, want %q", got.ShimName, tt.wantShimName)
+			if got.Shim == nil || got.Shim.Name != tt.wantShimName {
+				gotName := ""
+				if got.Shim != nil {
+					gotName = got.Shim.Name
+				}
+				t.Errorf("WithDefaults().Shim.Name = %q, want %q", gotName, tt.wantShimName)
 			}
 
 			if tt.wantOSVersions == nil {

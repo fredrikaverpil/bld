@@ -149,22 +149,49 @@ The GitHub release workflow requires the following repository settings:
   - [x] **Read and write permissions**
   - [x] **Allow GitHub Actions to create and approve pull requests**
 
-### A note on Windows
+### Windows Support
 
-The `./bld` wrapper script requires a bash-compatible shell. On Windows, use one
-of:
+By default, bld generates a Posix-compatible `./bld` script that works with
+bash. For native Windows support, you can enable Windows shims in your
+`.bld/config.go`:
 
-- Git Bash (included with Git for Windows)
-- WSL (Windows Subsystem for Linux)
-- GitHub Actions (with `shell: bash` - this is set automatically in generated
-  workflows)
+```go
+var Config = bld.Config{
+    Shim: &bld.ShimConfig{
+        Name:       "bld",  // base name (default: "bld")
+        Posix:      true,   // ./bld (bash) - default
+        Windows:    true,   // bld.cmd (requires Go in PATH)
+        PowerShell: true,   // bld.ps1 (can auto-download Go)
+    },
+    // ... rest of config
+}
+```
 
-Alternatively, create a `bld.cmd` wrapper:
+After updating the config, run `./bld generate` to create the Windows shims.
+
+**Shim types:**
+
+| Shim          | File      | Go Auto-Download | Notes                        |
+| ------------- | --------- | ---------------- | ---------------------------- |
+| Posix         | `./bld`   | Yes              | Works with bash, Git Bash    |
+| Windows (CMD) | `bld.cmd` | No               | Requires Go in PATH          |
+| PowerShell    | `bld.ps1` | Yes              | Full-featured Windows option |
+
+**Using the shims on Windows:**
 
 ```batch
-@echo off
-go run -C .bld . %*
+rem CMD
+bld.cmd go-test
+
+rem PowerShell
+.\bld.ps1 go-test
 ```
+
+**Alternative approaches:**
+
+- Git Bash (included with Git for Windows) - use `./bld` directly
+- WSL (Windows Subsystem for Linux) - use `./bld` directly
+- GitHub Actions - uses `shell: bash` automatically in generated workflows
 
 ## Adding a New Ecosystem
 

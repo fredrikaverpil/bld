@@ -1,0 +1,39 @@
+name: windows-shims
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-cmd:
+    name: Test CMD shim
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Show help
+        shell: cmd
+        run: bld.cmd -h
+      - name: Run go-test
+        shell: cmd
+        run: bld.cmd go-test
+
+  test-powershell:
+    name: Test PowerShell shim
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          cache: false
+      - name: Show help
+        shell: pwsh
+        run: .\bld.ps1 -h
+      - name: Run go-test
+        shell: pwsh
+        run: .\bld.ps1 go-test

@@ -8,9 +8,9 @@ import (
 
 // Config defines the configuration for a project using bld.
 type Config struct {
-	// ShimName is the name of the generated shim scripts.
-	// Default: "bld"
-	ShimName string
+	// Shim controls shim script generation.
+	// By default, only Posix (./bld) is generated with name "bld".
+	Shim *ShimConfig
 
 	// SkipGitDiff disables the git diff check at the end of the "all" task.
 	// By default, "all" fails if there are uncommitted changes after running all tasks.
@@ -37,6 +37,25 @@ type Config struct {
 	//	    ".": {{Name: "deploy", Usage: "deploy the app", Action: deployAction}},
 	//	},
 	Custom map[string][]goyek.Task
+}
+
+// ShimConfig controls shim script generation.
+type ShimConfig struct {
+	// Name is the base name of the generated shim scripts (without extension).
+	// Default: "bld"
+	Name string
+
+	// Posix generates a bash script (./bld).
+	// This is enabled by default if ShimConfig is nil.
+	Posix bool
+
+	// Windows generates a batch file (bld.cmd).
+	// The batch file requires Go to be installed and in PATH.
+	Windows bool
+
+	// PowerShell generates a PowerShell script (bld.ps1).
+	// The PowerShell script can auto-download Go if not found.
+	PowerShell bool
 }
 
 // GoConfig defines Go project configuration.
@@ -98,9 +117,17 @@ type GitHubConfig struct {
 
 // WithDefaults returns a copy of the config with default values applied.
 func (c Config) WithDefaults() Config {
-	if c.ShimName == "" {
-		c.ShimName = "bld"
+	// Default to Posix shim only if no Shim config is provided.
+	if c.Shim == nil {
+		c.Shim = &ShimConfig{Posix: true}
 	}
+	// Apply shim defaults.
+	shim := *c.Shim
+	if shim.Name == "" {
+		shim.Name = "bld"
+	}
+	c.Shim = &shim
+
 	if c.GitHub != nil {
 		gh := *c.GitHub
 		if len(gh.OSVersions) == 0 {
@@ -262,7 +289,7 @@ func (c Config) ForContext(context string) Config {
 	}
 
 	filtered := Config{
-		ShimName:    c.ShimName,    // Preserve shim name.
+		Shim:        c.Shim,        // Preserve shim config.
 		SkipGitDiff: c.SkipGitDiff, // Preserve git diff setting.
 		GitHub:      c.GitHub,      // Always preserve GitHub config.
 	}

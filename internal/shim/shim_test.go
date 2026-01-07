@@ -49,55 +49,69 @@ func TestCalculateBldDir(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := calculateBldDir(tt.context)
+			// Use forward slash separator (Posix).
+			got := calculateBldDir(tt.context, "/")
 			if got != tt.want {
-				t.Errorf("calculateBldDir(%q) = %q, want %q", tt.context, got, tt.want)
+				t.Errorf("calculateBldDir(%q, \"/\") = %q, want %q", tt.context, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestCalculateBldDir_AlwaysUsesForwardSlashes(t *testing.T) {
+func TestCalculateBldDir_PathSeparators(t *testing.T) {
 	t.Parallel()
 
-	// Test that output always uses forward slashes regardless of input format.
-	// This is important because the output is used in bash scripts.
+	// Test that output uses the correct path separator based on the parameter.
 	tests := []struct {
 		name    string
 		context string
+		pathSep string
 		want    string
 	}{
 		{
-			name:    "backslash input single depth",
-			context: "tests\\subdir",
-			want:    "../../.bld",
+			name:    "forward slash separator",
+			context: "tests",
+			pathSep: "/",
+			want:    "../.bld",
 		},
 		{
-			name:    "backslash input multiple depth",
-			context: "a\\b\\c",
+			name:    "backslash separator",
+			context: "tests",
+			pathSep: "\\",
+			want:    "..\\.bld",
+		},
+		{
+			name:    "forward slash separator deep",
+			context: "a/b/c",
+			pathSep: "/",
 			want:    "../../../.bld",
 		},
 		{
-			name:    "mixed slashes",
+			name:    "backslash separator deep",
+			context: "a/b/c",
+			pathSep: "\\",
+			want:    "..\\..\\..\\.bld",
+		},
+		{
+			name:    "mixed input slashes with forward output",
 			context: "a/b\\c",
+			pathSep: "/",
 			want:    "../../../.bld",
+		},
+		{
+			name:    "mixed input slashes with backslash output",
+			context: "a/b\\c",
+			pathSep: "\\",
+			want:    "..\\..\\..\\.bld",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := calculateBldDir(tt.context)
+			got := calculateBldDir(tt.context, tt.pathSep)
 			if got != tt.want {
-				t.Errorf("calculateBldDir(%q) = %q, want %q", tt.context, got, tt.want)
-			}
-			// Verify no backslashes in output.
-			if strings.Contains(got, "\\") {
-				t.Errorf(
-					"calculateBldDir(%q) = %q contains backslashes, should only use forward slashes",
-					tt.context,
-					got,
-				)
+				t.Errorf("calculateBldDir(%q, %q) = %q, want %q", tt.context, tt.pathSep, got, tt.want)
 			}
 		})
 	}
@@ -183,7 +197,10 @@ func TestGenerateWithRoot(t *testing.T) {
 		{
 			name: "custom shim name",
 			config: bld.Config{
-				ShimName: "build",
+				Shim: &bld.ShimConfig{
+					Name:  "build",
+					Posix: true,
+				},
 				Go: &bld.GoConfig{
 					Modules: map[string]bld.GoModuleOptions{
 						".": {},
@@ -242,6 +259,98 @@ func TestGenerateWithRoot(t *testing.T) {
 				filepath.Join("deploy", "bld"): "../.bld", // Always forward slashes for bash.
 			},
 		},
+		{
+			name: "windows shim enabled",
+			config: bld.Config{
+				Shim: &bld.ShimConfig{
+					Posix:   true,
+					Windows: true,
+				},
+				Go: &bld.GoConfig{
+					Modules: map[string]bld.GoModuleOptions{
+						".": {},
+					},
+				},
+			},
+			wantShims: []string{"bld", "bld.cmd"},
+			wantContexts: map[string]string{
+				"bld":     ".",
+				"bld.cmd": ".",
+			},
+			wantBldDirs: map[string]string{
+				"bld":     ".bld",
+				"bld.cmd": ".bld",
+			},
+		},
+		{
+			name: "powershell shim enabled",
+			config: bld.Config{
+				Shim: &bld.ShimConfig{
+					Posix:      true,
+					PowerShell: true,
+				},
+				Go: &bld.GoConfig{
+					Modules: map[string]bld.GoModuleOptions{
+						".": {},
+					},
+				},
+			},
+			wantShims: []string{"bld", "bld.ps1"},
+			wantContexts: map[string]string{
+				"bld":     ".",
+				"bld.ps1": ".",
+			},
+			wantBldDirs: map[string]string{
+				"bld":     ".bld",
+				"bld.ps1": ".bld",
+			},
+		},
+		{
+			name: "all shim types enabled",
+			config: bld.Config{
+				Shim: &bld.ShimConfig{
+					Posix:      true,
+					Windows:    true,
+					PowerShell: true,
+				},
+				Go: &bld.GoConfig{
+					Modules: map[string]bld.GoModuleOptions{
+						".": {},
+					},
+				},
+			},
+			wantShims: []string{"bld", "bld.cmd", "bld.ps1"},
+			wantContexts: map[string]string{
+				"bld":     ".",
+				"bld.cmd": ".",
+				"bld.ps1": ".",
+			},
+			wantBldDirs: map[string]string{
+				"bld":     ".bld",
+				"bld.cmd": ".bld",
+				"bld.ps1": ".bld",
+			},
+		},
+		{
+			name: "windows only - no posix",
+			config: bld.Config{
+				Shim: &bld.ShimConfig{
+					Windows: true,
+				},
+				Go: &bld.GoConfig{
+					Modules: map[string]bld.GoModuleOptions{
+						".": {},
+					},
+				},
+			},
+			wantShims: []string{"bld.cmd"},
+			wantContexts: map[string]string{
+				"bld.cmd": ".",
+			},
+			wantBldDirs: map[string]string{
+				"bld.cmd": ".bld",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -257,7 +366,7 @@ func TestGenerateWithRoot(t *testing.T) {
 				t.Fatalf("creating .bld directory: %v", err)
 			}
 
-			goMod := "module bld\n\ngo 1.23.0\n"
+			goMod := "module bld\n\ngo 1.25.5\n"
 			if err := os.WriteFile(filepath.Join(bldDir, "go.mod"), []byte(goMod), 0o644); err != nil {
 				t.Fatalf("writing go.mod: %v", err)
 			}
@@ -290,25 +399,51 @@ func TestGenerateWithRoot(t *testing.T) {
 
 				contentStr := string(content)
 
+				// Determine the shim type based on extension.
+				isBash := !strings.HasSuffix(shimPath, ".cmd") && !strings.HasSuffix(shimPath, ".ps1")
+				isCmd := strings.HasSuffix(shimPath, ".cmd")
+				isPs1 := strings.HasSuffix(shimPath, ".ps1")
+
 				// Verify BLD_CONTEXT.
 				if wantContext, ok := tt.wantContexts[shimPath]; ok {
-					expectedContext := `BLD_CONTEXT="` + wantContext + `"`
-					if !strings.Contains(contentStr, expectedContext) {
+					var found bool
+					switch {
+					case isBash:
+						found = strings.Contains(contentStr, `BLD_CONTEXT="`+wantContext+`"`)
+					case isCmd:
+						found = strings.Contains(contentStr, `set "BLD_CONTEXT=`+wantContext+`"`)
+					case isPs1:
+						found = strings.Contains(contentStr, `$BldContext = "`+wantContext+`"`)
+					}
+					if !found {
 						t.Errorf("shim %q: expected BLD_CONTEXT=%q not found in content", shimPath, wantContext)
 					}
 				}
 
 				// Verify BLD_DIR.
 				if wantBldDir, ok := tt.wantBldDirs[shimPath]; ok {
-					expectedBldDir := `BLD_DIR="` + wantBldDir + `"`
-					if !strings.Contains(contentStr, expectedBldDir) {
+					var found bool
+					// Windows shims use backslashes in paths.
+					windowsBldDir := strings.ReplaceAll(wantBldDir, "/", "\\")
+					switch {
+					case isBash:
+						found = strings.Contains(contentStr, `BLD_DIR="`+wantBldDir+`"`)
+					case isCmd:
+						found = strings.Contains(contentStr, `set "BLD_DIR=`+windowsBldDir+`"`)
+					case isPs1:
+						found = strings.Contains(contentStr, `$BldDir = "`+windowsBldDir+`"`)
+					}
+					if !found {
 						t.Errorf("shim %q: expected BLD_DIR=%q not found in content", shimPath, wantBldDir)
 					}
 				}
 
-				// Verify Go version.
-				if !strings.Contains(contentStr, `GO_VERSION="1.23.0"`) {
-					t.Errorf("shim %q: expected GO_VERSION=1.23.0 not found", shimPath)
+				// Verify Go version (only for bash and powershell which include it).
+				if isBash && !strings.Contains(contentStr, `GO_VERSION="1.25.5"`) {
+					t.Errorf("shim %q: expected GO_VERSION=1.25.5 not found", shimPath)
+				}
+				if isPs1 && !strings.Contains(contentStr, `$GoVersion = "1.25.5"`) {
+					t.Errorf("shim %q: expected GoVersion=1.25.5 not found", shimPath)
 				}
 			}
 		})
@@ -387,20 +522,20 @@ func TestExtractGoVersionFromDir(t *testing.T) {
 	}{
 		{
 			name:         "standard go.mod",
-			goModContent: "module example\n\ngo 1.23.0\n",
-			wantVersion:  "1.23.0",
+			goModContent: "module example\n\ngo 1.25.5\n",
+			wantVersion:  "1.25.5",
 			wantErr:      false,
 		},
 		{
 			name:         "go directive with extra whitespace",
-			goModContent: "module example\n\ngo   1.22.5  \n",
-			wantVersion:  "1.22.5",
+			goModContent: "module example\n\ngo   1.25.5  \n",
+			wantVersion:  "1.25.5",
 			wantErr:      false,
 		},
 		{
 			name:         "go directive first",
-			goModContent: "go 1.21\nmodule example\n",
-			wantVersion:  "1.21",
+			goModContent: "go 1.25.5\nmodule example\n",
+			wantVersion:  "1.25.5",
 			wantErr:      false,
 		},
 		{

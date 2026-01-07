@@ -4,6 +4,11 @@ import "github.com/fredrikaverpil/bld"
 
 // Config defines the build configuration for this project.
 var Config = bld.Config{
+	Shim: &bld.ShimConfig{
+		Posix:      true,
+		Windows:    true,
+		PowerShell: true,
+	},
 	Go: &bld.GoConfig{
 		Modules: map[string]bld.GoModuleOptions{
 			".": {},
