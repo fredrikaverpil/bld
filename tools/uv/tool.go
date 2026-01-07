@@ -22,7 +22,7 @@ func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err := Prepare(ctx); err != nil {
 		return nil, err
 	}
-	return bld.Command(ctx, bld.FromBinDir(name), args...), nil
+	return bld.Command(ctx, bld.FromBinDir(bld.BinaryName(name)), args...), nil
 }
 
 // Run installs (if needed) and executes uv.
@@ -47,34 +47,64 @@ func CreateVenv(ctx context.Context, venvPath, pythonVersion string) error {
 
 // PipInstall installs a package into a virtual environment.
 func PipInstall(ctx context.Context, venvPath, pkg string) error {
-	return Run(ctx, "pip", "install", "--python", filepath.Join(venvPath, "bin", "python"), pkg)
+	return Run(ctx, "pip", "install", "--python", venvPython(venvPath), pkg)
 }
 
 // PipInstallRequirements installs packages from a requirements.txt file.
 func PipInstallRequirements(ctx context.Context, venvPath, requirementsPath string) error {
-	return Run(ctx, "pip", "install", "--python", filepath.Join(venvPath, "bin", "python"), "-r", requirementsPath)
+	return Run(ctx, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
+}
+
+// venvPython returns the path to the Python executable in a venv.
+// On Windows, it's Scripts\python.exe; on Unix, it's bin/python.
+func venvPython(venvPath string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(venvPath, "Scripts", "python.exe")
+	}
+	return filepath.Join(venvPath, "bin", "python")
 }
 
 // Prepare ensures uv is installed.
 func Prepare(ctx context.Context) error {
 	binDir := bld.FromToolsDir(name, version, "bin")
-	binary := filepath.Join(binDir, name)
+	binaryName := name
+	if runtime.GOOS == "windows" {
+		binaryName = name + ".exe"
+	}
+	binary := filepath.Join(binDir, binaryName)
 
-	binURL := fmt.Sprintf(
-		"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.tar.gz",
-		version,
-		platformArch(),
-	)
+	// Windows uses .zip, others use .tar.gz.
+	var binURL string
+	var opts []tool.Opt
+	if runtime.GOOS == "windows" {
+		binURL = fmt.Sprintf(
+			"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.zip",
+			version,
+			platformArch(),
+		)
+		opts = []tool.Opt{
+			tool.WithDestinationDir(binDir),
+			tool.WithUnzip(),
+			tool.WithExtractFiles(binaryName),
+			tool.WithSkipIfFileExists(binary),
+			tool.WithSymlink(binary),
+		}
+	} else {
+		binURL = fmt.Sprintf(
+			"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.tar.gz",
+			version,
+			platformArch(),
+		)
+		opts = []tool.Opt{
+			tool.WithDestinationDir(binDir),
+			tool.WithUntarGz(),
+			tool.WithExtractFiles(binaryName),
+			tool.WithSkipIfFileExists(binary),
+			tool.WithSymlink(binary),
+		}
+	}
 
-	return tool.FromRemote(
-		ctx,
-		binURL,
-		tool.WithDestinationDir(binDir),
-		tool.WithUntarGz(),
-		tool.WithExtractFiles(name),
-		tool.WithSkipIfFileExists(binary),
-		tool.WithSymlink(binary),
-	)
+	return tool.FromRemote(ctx, binURL, opts...)
 }
 
 func platformArch() string {

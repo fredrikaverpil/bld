@@ -19,7 +19,7 @@ func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err := Prepare(ctx); err != nil {
 		return nil, err
 	}
-	return bld.Command(ctx, bld.FromBinDir(name), args...), nil
+	return bld.Command(ctx, bld.FromBinDir(bld.BinaryName(name)), args...), nil
 }
 
 // Run installs (if needed) and executes govulncheck.

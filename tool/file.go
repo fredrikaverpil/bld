@@ -406,7 +406,8 @@ func copyFile(src, dst string) error {
 }
 
 // CreateSymlink creates a symlink in .bld/bin pointing to the given binary.
-// Returns the path to the symlink.
+// On Windows, it copies the file instead since symlinks require admin privileges.
+// Returns the path to the symlink (or copy on Windows).
 func CreateSymlink(binaryPath string) (string, error) {
 	binDir := bld.FromBinDir()
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
@@ -414,24 +415,37 @@ func CreateSymlink(binaryPath string) (string, error) {
 	}
 
 	name := filepath.Base(binaryPath)
-	symlinkPath := filepath.Join(binDir, name)
+	linkPath := filepath.Join(binDir, name)
 
-	// Remove existing symlink if it exists
-	if _, err := os.Lstat(symlinkPath); err == nil {
-		if err := os.Remove(symlinkPath); err != nil {
-			return "", fmt.Errorf("remove existing symlink: %w", err)
+	// Remove existing file/symlink if it exists.
+	if _, err := os.Lstat(linkPath); err == nil {
+		if err := os.Remove(linkPath); err != nil {
+			return "", fmt.Errorf("remove existing file: %w", err)
 		}
 	}
 
-	// Create relative symlink
+	// On Windows, copy the file instead of creating a symlink.
+	if isWindows() {
+		if err := copyFile(binaryPath, linkPath); err != nil {
+			return "", fmt.Errorf("copy binary: %w", err)
+		}
+		return linkPath, nil
+	}
+
+	// Create relative symlink on Unix.
 	relPath, err := filepath.Rel(binDir, binaryPath)
 	if err != nil {
 		return "", fmt.Errorf("compute relative path: %w", err)
 	}
 
-	if err := os.Symlink(relPath, symlinkPath); err != nil {
+	if err := os.Symlink(relPath, linkPath); err != nil {
 		return "", fmt.Errorf("create symlink: %w", err)
 	}
 
-	return symlinkPath, nil
+	return linkPath, nil
+}
+
+// isWindows returns true if running on Windows.
+func isWindows() bool {
+	return os.PathSeparator == '\\' && os.PathListSeparator == ';'
 }

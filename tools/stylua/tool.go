@@ -27,7 +27,7 @@ func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err := Prepare(ctx); err != nil {
 		return nil, err
 	}
-	return bld.Command(ctx, bld.FromBinDir(name), args...), nil
+	return bld.Command(ctx, bld.FromBinDir(bld.BinaryName(name)), args...), nil
 }
 
 // Run installs (if needed) and executes stylua.
@@ -68,7 +68,11 @@ func ConfigPath() (string, error) {
 // Prepare ensures stylua is installed.
 func Prepare(ctx context.Context) error {
 	binDir := bld.FromToolsDir(name, version, "bin")
-	binary := filepath.Join(binDir, name)
+	binaryName := name
+	if runtime.GOOS == "windows" {
+		binaryName = name + ".exe"
+	}
+	binary := filepath.Join(binDir, binaryName)
 
 	binURL := fmt.Sprintf(
 		"https://github.com/JohnnyMorganz/StyLua/releases/download/v%s/stylua-%s-%s.zip",

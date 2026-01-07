@@ -4,6 +4,7 @@ package bld
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 )
 
@@ -69,4 +70,13 @@ func FromToolsDir(elem ...string) string {
 // If no elements are provided, returns the bin directory itself.
 func FromBinDir(elem ...string) string {
 	return FromBldDir(append([]string{BinDirName}, elem...)...)
+}
+
+// BinaryName returns the binary name with the correct extension for the current OS.
+// On Windows, it appends ".exe" to the name.
+func BinaryName(name string) string {
+	if runtime.GOOS == "windows" {
+		return name + ".exe"
+	}
+	return name
 }

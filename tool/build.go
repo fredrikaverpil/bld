@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/fredrikaverpil/bld"
@@ -16,16 +17,19 @@ import (
 // and symlinked to .bld/bin/<binary-name>.
 // Returns the path to the installed binary.
 func GoInstall(ctx context.Context, pkg, version string) (string, error) {
-	// Determine binary name from package path
+	// Determine binary name from package path.
 	binaryName := goBinaryName(pkg)
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
 
 	// Destination directory: .bld/tools/go/<pkg>/<version>/
 	toolDir := bld.FromToolsDir("go", pkg, version)
 	binaryPath := filepath.Join(toolDir, binaryName)
 
-	// Check if already installed
+	// Check if already installed.
 	if _, err := os.Stat(binaryPath); err == nil {
-		// Already installed, ensure symlink exists
+		// Already installed, ensure symlink exists.
 		if _, err := CreateSymlink(binaryPath); err != nil {
 			return "", err
 		}

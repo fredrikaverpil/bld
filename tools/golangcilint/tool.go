@@ -27,7 +27,7 @@ func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err := Prepare(ctx); err != nil {
 		return nil, err
 	}
-	return bld.Command(ctx, bld.FromBinDir(name), args...), nil
+	return bld.Command(ctx, bld.FromBinDir(bld.BinaryName(name)), args...), nil
 }
 
 // Run installs (if needed) and executes golangci-lint.
@@ -74,25 +74,48 @@ func ConfigPath() (string, error) {
 // Prepare ensures golangci-lint is installed.
 func Prepare(ctx context.Context) error {
 	binDir := bld.FromToolsDir(name, version, "bin")
-	binary := filepath.Join(binDir, name)
+	binaryName := name
+	if runtime.GOOS == "windows" {
+		binaryName = name + ".exe"
+	}
+	binary := filepath.Join(binDir, binaryName)
 
-	binURL := fmt.Sprintf(
-		"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.tar.gz",
-		version,
-		version,
-		runtime.GOOS,
-		archName(),
-	)
+	// Windows uses .zip, others use .tar.gz.
+	var binURL string
+	var opts []tool.Opt
+	if runtime.GOOS == "windows" {
+		binURL = fmt.Sprintf(
+			"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.zip",
+			version,
+			version,
+			runtime.GOOS,
+			archName(),
+		)
+		opts = []tool.Opt{
+			tool.WithDestinationDir(binDir),
+			tool.WithUnzip(),
+			tool.WithExtractFiles(binaryName),
+			tool.WithSkipIfFileExists(binary),
+			tool.WithSymlink(binary),
+		}
+	} else {
+		binURL = fmt.Sprintf(
+			"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.tar.gz",
+			version,
+			version,
+			runtime.GOOS,
+			archName(),
+		)
+		opts = []tool.Opt{
+			tool.WithDestinationDir(binDir),
+			tool.WithUntarGz(),
+			tool.WithExtractFiles(binaryName),
+			tool.WithSkipIfFileExists(binary),
+			tool.WithSymlink(binary),
+		}
+	}
 
-	return tool.FromRemote(
-		ctx,
-		binURL,
-		tool.WithDestinationDir(binDir),
-		tool.WithUntarGz(),
-		tool.WithExtractFiles(name),
-		tool.WithSkipIfFileExists(binary),
-		tool.WithSymlink(binary),
-	)
+	return tool.FromRemote(ctx, binURL, opts...)
 }
 
 func archName() string {

@@ -10,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/fredrikaverpil/bld"
+	"github.com/fredrikaverpil/bld/tool"
 	"github.com/fredrikaverpil/bld/tools/uv"
 )
 
@@ -28,7 +30,7 @@ func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
 	if err := Prepare(ctx); err != nil {
 		return nil, err
 	}
-	return bld.Command(ctx, bld.FromBinDir(name), args...), nil
+	return bld.Command(ctx, bld.FromBinDir(bld.BinaryName(name)), args...), nil
 }
 
 // Run installs (if needed) and executes mdformat.
@@ -53,35 +55,39 @@ func versionHash() string {
 func Prepare(ctx context.Context) error {
 	// Use hash-based versioning: .bld/tools/mdformat/<hash>/
 	venvDir := bld.FromToolsDir(name, versionHash())
-	binary := filepath.Join(venvDir, "bin", name)
 
-	// Skip if already installed
-	if _, err := os.Stat(binary); err == nil {
-		return nil
+	// On Windows, venv uses Scripts/ instead of bin/, and .exe extension.
+	var binary string
+	if runtime.GOOS == "windows" {
+		binary = filepath.Join(venvDir, "Scripts", name+".exe")
+	} else {
+		binary = filepath.Join(venvDir, "bin", name)
 	}
 
-	// Create virtual environment with Python 3.13+ for --exclude support
+	// Skip if already installed.
+	if _, err := os.Stat(binary); err == nil {
+		// Ensure symlink/copy exists.
+		_, err := tool.CreateSymlink(binary)
+		return err
+	}
+
+	// Create virtual environment with Python 3.13+ for --exclude support.
 	if err := uv.CreateVenv(ctx, venvDir, pythonVersion); err != nil {
 		return err
 	}
 
-	// Write requirements.txt to venv dir
+	// Write requirements.txt to venv dir.
 	reqPath := filepath.Join(venvDir, "requirements.txt")
 	if err := os.WriteFile(reqPath, requirements, 0o644); err != nil {
 		return err
 	}
 
-	// Install from requirements.txt
+	// Install from requirements.txt.
 	if err := uv.PipInstallRequirements(ctx, venvDir, reqPath); err != nil {
 		return err
 	}
 
-	// Create symlink to .bld/bin/
-	binDir := bld.FromBinDir()
-	if err := os.MkdirAll(binDir, 0o755); err != nil {
-		return err
-	}
-	symlinkPath := filepath.Join(binDir, name)
-	_ = os.Remove(symlinkPath) // Remove existing symlink if any
-	return os.Symlink(binary, symlinkPath)
+	// Create symlink (or copy on Windows) to .bld/bin/.
+	_, err := tool.CreateSymlink(binary)
+	return err
 }
