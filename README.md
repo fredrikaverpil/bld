@@ -156,7 +156,8 @@ of:
 
 - Git Bash (included with Git for Windows)
 - WSL (Windows Subsystem for Linux)
-- GitHub Actions (uses bash by default)
+- GitHub Actions (with `shell: bash` - this is set automatically in generated
+  workflows)
 
 Alternatively, create a `bld.cmd` wrapper:
 
@@ -170,12 +171,14 @@ go run -C .bld . %*
 To add support for a new language/ecosystem (e.g., Python, Lua):
 
 1. **Create tools** in `tools/<toolname>/tool.go`
-   - Export `Prepare(ctx) error`, `Command(ctx, args) *Cmd`,
+   - Export `Prepare(ctx) error`, `Command(ctx, args) (*Cmd, error)`,
      `Run(ctx, args) error`
+   - Both `Command()` and `Run()` auto-prepare the tool
    - Add Renovate comment for version updates
 1. **Create tasks** in `tasks/<ecosystem>/tasks.go`
    - Define goyek tasks that use the tools
-   - Call `tool.Prepare()` before `tool.Command()`, or just use `tool.Run()`
+   - Use `tool.Command()` when you need to customize the command (e.g., set
+     `cmd.Dir`), or `tool.Run()` for simple execution
 1. **Add tool tests** in `tools/tools_test.go`
    - Add one line to the `tools` table
 1. **Wire up in config** - add config options in `config.go` if needed
