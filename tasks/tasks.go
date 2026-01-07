@@ -56,29 +56,39 @@ func New(cfg bld.Config) *Tasks {
 	// Start with generate as first dep (runs before everything else)
 	deps := goyek.Deps{t.Generate}
 
-	// Create Go tasks if configured
+	// Create Go tasks if configured.
+	// Only add tasks to "all" deps if there are modules configured for that task.
 	if cfg.Go != nil {
 		t.Go = golang.NewTasks(cfg)
-		deps = append(deps, t.Go.All)
+		if len(cfg.GoModulesForFormat()) > 0 {
+			deps = append(deps, t.Go.Format)
+		}
+		if len(cfg.GoModulesForLint()) > 0 {
+			deps = append(deps, t.Go.Lint)
+		}
+		if len(cfg.GoModulesForTest()) > 0 {
+			deps = append(deps, t.Go.Test)
+		}
+		if len(cfg.GoModulesForVulncheck()) > 0 {
+			deps = append(deps, t.Go.Vulncheck)
+		}
 	}
 
-	// Create Lua tasks if configured
+	// Create Lua tasks if configured.
 	if cfg.Lua != nil {
 		t.Lua = lua.NewTasks(cfg)
-		// Note: Not added to "all" yet, use "lua-fmt" explicitly
+		if len(cfg.LuaModulesForFormat()) > 0 {
+			deps = append(deps, t.Lua.Format)
+		}
 	}
 
-	// Create Markdown tasks if configured
+	// Create Markdown tasks if configured.
 	if cfg.Markdown != nil {
 		t.Markdown = markdown.NewTasks(cfg)
-		deps = append(deps, t.Markdown.All)
+		if len(cfg.MarkdownModulesForFormat()) > 0 {
+			deps = append(deps, t.Markdown.Format)
+		}
 	}
-
-	// Future: Python, etc.
-	// if cfg.Python != nil {
-	//     t.Python = python.NewTasks(cfg)
-	//     deps = append(deps, t.Python.All)
-	// }
 
 	// Define custom tasks from config and add them to deps.
 	for _, task := range cfg.CustomTasks() {

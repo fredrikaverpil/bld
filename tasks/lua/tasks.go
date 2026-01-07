@@ -11,9 +11,6 @@ import (
 type Tasks struct {
 	config bld.Config
 
-	// All runs all Lua tasks.
-	All *goyek.DefinedTask
-
 	// Format formats Lua files using stylua.
 	Format *goyek.DefinedTask
 }
@@ -42,12 +39,6 @@ func NewTasks(cfg bld.Config) *Tasks {
 				}
 			}
 		},
-	})
-
-	t.All = goyek.Define(goyek.Task{
-		Name:  "lua-all",
-		Usage: "run all Lua tasks (format)",
-		Deps:  goyek.Deps{t.Format},
 	})
 
 	return t

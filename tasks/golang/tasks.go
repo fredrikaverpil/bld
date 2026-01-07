@@ -13,9 +13,6 @@ import (
 type Tasks struct {
 	config bld.Config
 
-	// All runs all Go tasks (lint, format, test, vulncheck).
-	All *goyek.DefinedTask
-
 	// Format formats Go code using go fmt.
 	Format *goyek.DefinedTask
 
@@ -132,12 +129,6 @@ func NewTasks(cfg bld.Config) *Tasks {
 				}
 			}
 		},
-	})
-
-	t.All = goyek.Define(goyek.Task{
-		Name:  "go-all",
-		Usage: "run all Go tasks (format, lint, test, vulncheck)",
-		Deps:  goyek.Deps{t.Format, t.Lint, t.Test, t.Vulncheck},
 	})
 
 	return t

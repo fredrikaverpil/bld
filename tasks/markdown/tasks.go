@@ -11,9 +11,6 @@ import (
 type Tasks struct {
 	config bld.Config
 
-	// All runs all Markdown tasks.
-	All *goyek.DefinedTask
-
 	// Format formats Markdown files using mdformat.
 	Format *goyek.DefinedTask
 }
@@ -38,12 +35,6 @@ func NewTasks(cfg bld.Config) *Tasks {
 				}
 			}
 		},
-	})
-
-	t.All = goyek.Define(goyek.Task{
-		Name:  "md-all",
-		Usage: "run all Markdown tasks (format)",
-		Deps:  goyek.Deps{t.Format},
 	})
 
 	return t
