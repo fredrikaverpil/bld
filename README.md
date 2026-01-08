@@ -61,7 +61,8 @@ Add task groups or tasks in `.pocket/config.go` as desired. More on that below.
 > Shim: &pocket.ShimConfig{Name: "build"}  // creates ./build instead
 > ```
 >
-> Or add a shell alias: `alias pok='./pok'`
+> Or add a shell alias: `alias pok='./pok'` if you want to skip having to type
+> out the `./` part
 
 ## Configuration
 
