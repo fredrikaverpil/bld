@@ -98,20 +98,33 @@ var Config = pocket.Config{
 **Auto-detection with default options:**
 
 ```go
-golang.Auto(golang.Options{
-    Lint: golang.LintOptions{ConfigFile: ".golangci.yml"},
-})
+var Config = pocket.Config{
+    TaskGroups: []pocket.TaskGroup{
+        golang.Auto(golang.Options{
+            Lint: golang.LintOptions{ConfigFile: ".golangci.yml"},
+        }),
+    },
+}
 ```
 
 **Auto-detection with skip patterns:**
 
 ```go
-golang.Auto(
-    golang.Options{},
-    pocket.SkipPath(`\.pocket`),            // skip all tasks in .pocket/
-    pocket.SkipTask("go-vulncheck", `.*`),  // skip vulncheck everywhere
-)
+var Config = pocket.Config{
+    TaskGroups: []pocket.TaskGroup{
+        golang.Auto(
+            golang.Options{},
+            pocket.SkipPath(`\.pocket`),           // skip all tasks in .pocket/
+            pocket.SkipTask("go-vulncheck", `.*`), // skip vulncheck everywhere
+        ),
+    },
+}
 ```
+
+> [!TIP]
+>
+> Use `SkipPath` to exclude a folder from auto-detection, then add it explicitly
+> with `golang.New()` to define custom options for that folder.
 
 **Explicit configuration:**
 
@@ -119,8 +132,8 @@ golang.Auto(
 var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{
         golang.New(map[string]golang.Options{
-            ".":          {},                              // all tasks enabled
-            "subdir/lib": {Skip: []string{"go-format"}},   // skip format for this module
+            ".":          {},                            // all tasks enabled
+            "subdir/lib": {Skip: []string{"go-format"}}, // skip format for this module
         }),
     },
 }
@@ -129,14 +142,18 @@ var Config = pocket.Config{
 **Task-specific options:**
 
 ```go
-golang.New(map[string]golang.Options{
-    "proj1": {
-        Lint: golang.LintOptions{ConfigFile: "proj1/.golangci.yml"},
+var Config = pocket.Config{
+    TaskGroups: []pocket.TaskGroup{
+        golang.New(map[string]golang.Options{
+            "proj1": {
+                Lint: golang.LintOptions{ConfigFile: "proj1/.golangci.yml"},
+            },
+            "proj2": {
+                Skip: []string{"go-test"}, // skip tests for this module
+            },
+        }),
     },
-    "proj2": {
-        Skip: []string{"go-test"},  // skip tests for this module
-    },
-})
+}
 ```
 
 ### Custom Tasks
@@ -379,11 +396,15 @@ if pocket.IsVerbose(ctx) {
 **Skip options (for Auto mode):**
 
 ```go
-golang.Auto(golang.Options{},
-    pocket.SkipPath(`\.pocket`),           // skip all tasks for matching paths
-    pocket.SkipTask("go-vulncheck", `.*`), // skip specific task for matching paths
-    pocket.ShowAll(),                       // make go-all visible in help
-)
+var Config = pocket.Config{
+    TaskGroups: []pocket.TaskGroup{
+        golang.Auto(golang.Options{},
+            pocket.SkipPath(`\.pocket`),           // skip all tasks for matching paths
+            pocket.SkipTask("go-vulncheck", `.*`), // skip specific task for matching paths
+            pocket.ShowAll(),                      // make go-all visible in help
+        ),
+    },
+}
 ```
 
 ## Acknowledgements
