@@ -17,7 +17,7 @@ import (
 const name = "golangci-lint"
 
 // renovate: datasource=github-releases depName=golangci/golangci-lint
-const version = "2.7.1"
+const version = "2.8.0"
 
 //go:embed golangci.yml
 var defaultConfig []byte
