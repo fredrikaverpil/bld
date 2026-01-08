@@ -1,7 +1,5 @@
 package pocket
 
-import "github.com/goyek/goyek/v3"
-
 // TaskGroup defines a collection of related tasks for a technology (e.g., Go, Lua, Markdown).
 // Implement this interface to create custom task groups.
 type TaskGroup interface {
@@ -12,8 +10,10 @@ type TaskGroup interface {
 	// The map keys are context paths (e.g., ".", "tests", "services/api").
 	Modules() map[string]ModuleConfig
 
-	// Tasks returns the goyek tasks provided by this task group.
-	Tasks(cfg Config) []*goyek.DefinedTask
+	// Tasks returns the tasks provided by this task group.
+	// The returned slice should include individual tasks plus an orchestrator
+	// task (marked Hidden) that controls execution order.
+	Tasks(cfg Config) []*Task
 
 	// ForContext returns a filtered task group containing only modules for the given path.
 	// For the root context ("."), returns the task group unchanged.

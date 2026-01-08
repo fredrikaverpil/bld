@@ -62,16 +62,9 @@ func runInit() error {
 	}
 
 	// Get dependencies
-	deps := []string{
-		"github.com/fredrikaverpil/pocket@latest",
-		"github.com/goyek/goyek/v3@latest",
-		"github.com/goyek/x@latest",
-	}
-	for _, dep := range deps {
-		fmt.Printf("  Adding %s\n", dep)
-		if err := runCommand(".pocket", "go", "get", dep); err != nil {
-			return fmt.Errorf("go get %s: %w", dep, err)
-		}
+	fmt.Println("  Adding github.com/fredrikaverpil/pocket@latest")
+	if err := runCommand(".pocket", "go", "get", "github.com/fredrikaverpil/pocket@latest"); err != nil {
+		return fmt.Errorf("go get: %w", err)
 	}
 
 	// Generate all scaffold files (config.go, .gitignore, main.go, shim)

@@ -3,6 +3,6 @@ module github.com/fredrikaverpil/pocket
 go 1.25.5
 
 require (
-	github.com/goyek/goyek/v3 v3.0.1
 	golang.org/x/mod v0.31.0
+	golang.org/x/sync v0.15.0
 )

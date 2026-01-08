@@ -89,22 +89,6 @@ if (Get-Command go -ErrorAction SilentlyContinue) {
     Write-Host "Go $GoVersion installed to $GoInstallDir"
 }
 
-# Insert -v before -- if present, otherwise append it.
-$NewArgs = @()
-$FoundSeparator = $false
-foreach ($arg in $args) {
-    if ($arg -eq "--") {
-        $NewArgs += "-v"
-        $NewArgs += "--"
-        $FoundSeparator = $true
-    } else {
-        $NewArgs += $arg
-    }
-}
-if (-not $FoundSeparator) {
-    $NewArgs += "-v"
-}
-
 $env:POK_CONTEXT = $PocketContext
-& $GoCmd run -C $PocketDir . @NewArgs
+& $GoCmd run -C $PocketDir . @args
 exit $LASTEXITCODE

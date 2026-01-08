@@ -8,8 +8,13 @@ import (
 
 var Config = pocket.Config{
 	TaskGroups: []pocket.TaskGroup{
-		golang.Auto(),
-		markdown.Auto(),
+		golang.New(map[string]golang.Options{
+			".": {},
+			// Note: .pocket is excluded because its tools/ dir confuses go tools
+		}),
+		markdown.New(map[string]markdown.Options{
+			".": {},
+		}),
 	},
 	Shim: &pocket.ShimConfig{
 		Posix:      true,

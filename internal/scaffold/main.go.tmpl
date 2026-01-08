@@ -7,9 +7,8 @@ package main
 import (
 	"os"
 
+	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tasks"
-	"github.com/goyek/goyek/v3"
-	"github.com/goyek/x/boot"
 )
 
 func main() {
@@ -23,6 +22,5 @@ func main() {
 	// Filtering for context is handled internally by tasks.New.
 	t := tasks.New(Config, context)
 
-	goyek.SetDefault(t.All)
-	boot.Main()
+	pocket.Main(t.AllTasks(), t.All)
 }

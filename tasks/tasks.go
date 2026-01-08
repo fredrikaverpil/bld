@@ -3,37 +3,38 @@
 package tasks
 
 import (
+	"context"
+
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tasks/generate"
 	"github.com/fredrikaverpil/pocket/tasks/gitdiff"
 	"github.com/fredrikaverpil/pocket/tasks/update"
-	"github.com/goyek/goyek/v3"
 )
 
 // Tasks holds all registered tasks based on the Config.
 type Tasks struct {
 	// All runs all configured tasks.
-	All *goyek.DefinedTask
+	All *pocket.Task
 
 	// Generate regenerates all generated files.
-	Generate *goyek.DefinedTask
+	Generate *pocket.Task
 
 	// Update updates pocket and regenerates files.
-	Update *goyek.DefinedTask
+	Update *pocket.Task
 
 	// GitDiff fails if there are uncommitted changes.
-	GitDiff *goyek.DefinedTask
+	GitDiff *pocket.Task
 
 	// Tasks holds standalone tasks registered for this context.
-	Tasks []*goyek.DefinedTask
+	Tasks []*pocket.Task
 
 	// TaskGroupTasks holds all tasks from registered task groups.
-	TaskGroupTasks []*goyek.DefinedTask
+	TaskGroupTasks []*pocket.Task
 }
 
 // New creates tasks based on the provided Config.
 // It filters both config and task groups for the current context.
-func New(cfg pocket.Config, context string) *Tasks {
+func New(cfg pocket.Config, ctxPath string) *Tasks {
 	cfg = cfg.WithDefaults()
 	t := &Tasks{}
 
@@ -43,47 +44,66 @@ func New(cfg pocket.Config, context string) *Tasks {
 	// Update is standalone (not part of "all")
 	t.Update = update.Task(cfg)
 
-	// Start with generate as first dep (runs before everything else)
-	deps := goyek.Deps{t.Generate}
+	// GitDiff is available as a standalone task.
+	t.GitDiff = gitdiff.Task()
 
 	// Filter config for context (this also filters task groups).
-	filteredCfg := cfg.ForContext(context)
+	filteredCfg := cfg.ForContext(ctxPath)
+
+	// Collect orchestrator tasks from task groups (hidden tasks that control order).
+	var orchestratorTasks []*pocket.Task
 
 	// Create tasks from context-filtered task groups.
 	for _, tg := range filteredCfg.TaskGroups {
 		tgTasks := tg.Tasks(filteredCfg)
-		t.TaskGroupTasks = append(t.TaskGroupTasks, tgTasks...)
 		for _, task := range tgTasks {
-			deps = append(deps, task)
-		}
-	}
-
-	// Define standalone tasks from filtered config and add them to deps.
-	for _, task := range filteredCfg.GetTasks() {
-		defined := goyek.Define(task)
-		t.Tasks = append(t.Tasks, defined)
-		deps = append(deps, defined)
-	}
-
-	// GitDiff is available as a standalone task.
-	t.GitDiff = gitdiff.Task()
-
-	// Create the "all" task that runs everything, then checks for uncommitted changes.
-	allTask := goyek.Task{
-		Name:  "all",
-		Usage: "run all tasks",
-		Deps:  deps,
-	}
-	if !cfg.SkipGitDiff {
-		allTask.Action = func(a *goyek.A) {
-			// Run git diff after all deps complete.
-			cmd := pocket.Command(a.Context(), "git", "diff", "--exit-code")
-			if err := cmd.Run(); err != nil {
-				a.Fatal("uncommitted changes detected; please commit or stage your changes")
+			t.TaskGroupTasks = append(t.TaskGroupTasks, task)
+			if task.Hidden {
+				// Hidden tasks are orchestrators that control execution order.
+				orchestratorTasks = append(orchestratorTasks, task)
 			}
 		}
 	}
-	t.All = goyek.Define(allTask)
+
+	// Define standalone tasks from filtered config.
+	t.Tasks = append(t.Tasks, filteredCfg.GetTasks()...)
+
+	// Create the "all" task that runs everything, then checks for uncommitted changes.
+	t.All = &pocket.Task{
+		Name:  "all",
+		Usage: "run all tasks",
+		Action: func(ctx context.Context) error {
+			// Generate first.
+			if err := pocket.SerialDeps(ctx, t.Generate); err != nil {
+				return err
+			}
+
+			// Run all task group orchestrators (each handles its own ordering).
+			if err := pocket.SerialDeps(ctx, orchestratorTasks...); err != nil {
+				return err
+			}
+
+			// Run custom user tasks in parallel.
+			if err := pocket.Deps(ctx, t.Tasks...); err != nil {
+				return err
+			}
+
+			// Git diff at the end (if not skipped).
+			if !cfg.SkipGitDiff {
+				return pocket.SerialDeps(ctx, t.GitDiff)
+			}
+			return nil
+		},
+	}
 
 	return t
+}
+
+// AllTasks returns all tasks including the "all" task.
+// This is used by the CLI to register all available tasks.
+func (t *Tasks) AllTasks() []*pocket.Task {
+	tasks := []*pocket.Task{t.All, t.Generate, t.Update, t.GitDiff}
+	tasks = append(tasks, t.TaskGroupTasks...)
+	tasks = append(tasks, t.Tasks...)
+	return tasks
 }

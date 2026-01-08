@@ -3,8 +3,6 @@ package pocket
 import (
 	"slices"
 	"sort"
-
-	"github.com/goyek/goyek/v3"
 )
 
 // Config defines the configuration for a project using pocket.
@@ -20,16 +18,16 @@ type Config struct {
 	//	},
 	TaskGroups []TaskGroup
 
-	// Tasks maps folder paths to custom goyek tasks.
+	// Tasks maps folder paths to custom tasks.
 	// Use "." for the root context.
 	// Tasks are included in the "all" task and shown in help output.
 	//
 	// Example:
 	//
-	//	Tasks: map[string][]goyek.Task{
+	//	Tasks: map[string][]*Task{
 	//	    ".": {{Name: "deploy", Usage: "deploy the app", Action: deployAction}},
 	//	},
-	Tasks map[string][]goyek.Task
+	Tasks map[string][]*Task
 
 	// Shim controls shim script generation.
 	// By default, only Posix (./pok) is generated with name "pok".
@@ -96,8 +94,8 @@ func (c Config) WithDefaults() Config {
 
 // GetTasks returns all custom tasks from the config.
 // For a filtered config (via ForContext), this returns only the tasks for that context.
-func (c Config) GetTasks() []goyek.Task {
-	var tasks []goyek.Task
+func (c Config) GetTasks() []*Task {
+	var tasks []*Task
 	for _, contextTasks := range c.Tasks {
 		tasks = append(tasks, contextTasks...)
 	}
@@ -138,7 +136,7 @@ func (c Config) ForContext(context string) Config {
 
 	// Filter custom tasks.
 	if tasks, ok := c.Tasks[context]; ok {
-		filtered.Tasks = map[string][]goyek.Task{
+		filtered.Tasks = map[string][]*Task{
 			context: tasks,
 		}
 	}

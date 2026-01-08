@@ -1,7 +1,5 @@
 package pocket
 
-import "github.com/goyek/goyek/v3"
-
 // AutoTaskGroup provides a generic auto-detecting task group wrapper.
 // O is the options type (e.g., golang.Options) which must implement ModuleConfig.
 type AutoTaskGroup[O ModuleConfig] struct {
@@ -72,7 +70,7 @@ func (tg *AutoTaskGroup[O]) ForContext(context string) TaskGroup {
 	return nil
 }
 
-func (tg *AutoTaskGroup[O]) Tasks(cfg Config) []*goyek.DefinedTask {
+func (tg *AutoTaskGroup[O]) Tasks(cfg Config) []*Task {
 	detected := tg.doDetect()
 	return tg.newGroup(detected).Tasks(cfg)
 }

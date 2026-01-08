@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-
-	"github.com/goyek/goyek/v3"
 )
 
 func TestDetectByFile(t *testing.T) {
@@ -198,7 +196,7 @@ func (tg *testTaskGroup) Modules() map[string]ModuleConfig {
 	return result
 }
 
-func (tg *testTaskGroup) Tasks(_ Config) []*goyek.DefinedTask { return nil }
+func (tg *testTaskGroup) Tasks(_ Config) []*Task { return nil }
 
 func (tg *testTaskGroup) ForContext(context string) TaskGroup {
 	if context == "." {

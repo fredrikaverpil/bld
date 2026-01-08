@@ -2,50 +2,61 @@
 package update
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/internal/scaffold"
-	"github.com/goyek/goyek/v3"
 )
 
-// Task returns a goyek task that updates pocket and regenerates files.
-func Task(cfg pocket.Config) *goyek.DefinedTask {
-	return goyek.Define(goyek.Task{
+// Task returns a task that updates pocket and regenerates files.
+func Task(cfg pocket.Config) *pocket.Task {
+	return &pocket.Task{
 		Name:  "update",
 		Usage: "update pocket dependency and regenerate files",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context) error {
 			pocketDir := filepath.Join(pocket.FromGitRoot(), pocket.DirName)
+			verbose := pocket.IsVerbose(ctx)
 
 			// Update pocket dependency
-			a.Log("Updating github.com/fredrikaverpil/pocket@latest")
-			cmd := exec.CommandContext(a.Context(), "go", "get", "-u", "github.com/fredrikaverpil/pocket@latest")
+			if verbose {
+				fmt.Println("Updating github.com/fredrikaverpil/pocket@latest")
+			}
+			cmd := exec.CommandContext(ctx, "go", "get", "-u", "github.com/fredrikaverpil/pocket@latest")
 			cmd.Dir = pocketDir
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
-				a.Fatalf("go get -u: %v", err)
+				return fmt.Errorf("go get -u: %w", err)
 			}
 
 			// Run go mod tidy
-			a.Log("Running go mod tidy")
-			cmd = exec.CommandContext(a.Context(), "go", "mod", "tidy")
+			if verbose {
+				fmt.Println("Running go mod tidy")
+			}
+			cmd = exec.CommandContext(ctx, "go", "mod", "tidy")
 			cmd.Dir = pocketDir
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
-				a.Fatalf("go mod tidy: %v", err)
+				return fmt.Errorf("go mod tidy: %w", err)
 			}
 
 			// Regenerate all files
-			a.Log("Regenerating files")
+			if verbose {
+				fmt.Println("Regenerating files")
+			}
 			if err := scaffold.GenerateAll(&cfg); err != nil {
-				a.Fatal(err)
+				return err
 			}
 
-			a.Log("Done!")
+			if verbose {
+				fmt.Println("Done!")
+			}
+			return nil
 		},
-	})
+	}
 }

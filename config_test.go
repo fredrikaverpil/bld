@@ -3,8 +3,6 @@ package pocket
 import (
 	"reflect"
 	"testing"
-
-	"github.com/goyek/goyek/v3"
 )
 
 func TestConfig_TaskPaths(t *testing.T) {
@@ -23,7 +21,7 @@ func TestConfig_TaskPaths(t *testing.T) {
 		{
 			name: "tasks paths",
 			config: Config{
-				Tasks: map[string][]goyek.Task{
+				Tasks: map[string][]*Task{
 					".":      nil,
 					"deploy": nil,
 				},
@@ -33,7 +31,7 @@ func TestConfig_TaskPaths(t *testing.T) {
 		{
 			name: "nested tasks paths",
 			config: Config{
-				Tasks: map[string][]goyek.Task{
+				Tasks: map[string][]*Task{
 					".":     nil,
 					"a/b":   nil,
 					"a/b/c": nil,
@@ -60,7 +58,7 @@ func TestConfig_ForContext(t *testing.T) {
 	baseConfig := Config{
 		Shim:        &ShimConfig{Name: "mypok", Posix: true},
 		SkipGitDiff: true,
-		Tasks: map[string][]goyek.Task{
+		Tasks: map[string][]*Task{
 			".":      nil,
 			"deploy": nil,
 			"tests":  nil,
@@ -293,7 +291,7 @@ func TestAllModulePaths(t *testing.T) {
 		{
 			name: "tasks paths included",
 			cfg: Config{
-				Tasks: map[string][]goyek.Task{
+				Tasks: map[string][]*Task{
 					"deploy": nil,
 				},
 			},
@@ -303,7 +301,7 @@ func TestAllModulePaths(t *testing.T) {
 			name: "task group and tasks paths combined",
 			cfg: Config{
 				TaskGroups: []TaskGroup{mockTG},
-				Tasks: map[string][]goyek.Task{
+				Tasks: map[string][]*Task{
 					"deploy": nil,
 				},
 			},
@@ -469,7 +467,7 @@ func (tg *mockTaskGroup) Modules() map[string]ModuleConfig {
 	return result
 }
 
-func (tg *mockTaskGroup) Tasks(_ Config) []*goyek.DefinedTask { return nil }
+func (tg *mockTaskGroup) Tasks(_ Config) []*Task { return nil }
 
 func (tg *mockTaskGroup) ForContext(context string) TaskGroup {
 	if context == "." {
