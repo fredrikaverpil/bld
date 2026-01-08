@@ -107,7 +107,7 @@ func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 		Name:   "py-all",
 		Usage:  "run all Python tasks",
 		Hidden: true,
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			// Format and lint run serially (they modify files).
 			if err := pocket.SerialDeps(ctx, formatTask, lintTask); err != nil {
 				return err
@@ -138,7 +138,7 @@ func FormatTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-format",
 		Usage: "format Python files",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Format.ConfigFile
 				if configPath == "" {
@@ -163,7 +163,7 @@ func LintTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-lint",
 		Usage: "lint Python files",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Lint.ConfigFile
 				if configPath == "" {
@@ -188,7 +188,7 @@ func TypecheckTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-typecheck",
 		Usage: "type-check Python files",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod := range modules {
 				if err := mypy.Run(ctx, mod); err != nil {
 					return fmt.Errorf("mypy failed in %s: %w", mod, err)

@@ -3,22 +3,33 @@ package pocket
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
 
+// ArgDef defines an argument that a task accepts.
+type ArgDef struct {
+	Name    string // argument name (used as key in key=value)
+	Usage   string // description for help output
+	Default string // default value if not provided
+}
+
 // Task represents a runnable task.
 type Task struct {
 	Name   string
 	Usage  string
-	Action func(ctx context.Context) error
+	Args   []ArgDef // declared arguments this task accepts
+	Action func(ctx context.Context, args map[string]string) error
 	Hidden bool
 
 	// once ensures the task runs exactly once per execution.
 	once sync.Once
 	// err stores the result of the task execution.
 	err error
+	// args stores the parsed arguments for this execution.
+	args map[string]string
 }
 
 // contextKey is the type for context keys used by this package.
@@ -40,6 +51,20 @@ func IsVerbose(ctx context.Context) bool {
 	return v
 }
 
+// SetArgs sets the arguments for this task execution.
+// Arguments are merged with defaults defined in Args.
+func (t *Task) SetArgs(args map[string]string) {
+	t.args = make(map[string]string)
+	// Apply defaults first.
+	for _, arg := range t.Args {
+		if arg.Default != "" {
+			t.args[arg.Name] = arg.Default
+		}
+	}
+	// Override with provided args.
+	maps.Copy(t.args, args)
+}
+
 // run executes the task's action exactly once.
 func (t *Task) run(ctx context.Context) error {
 	t.once.Do(func() {
@@ -48,7 +73,11 @@ func (t *Task) run(ctx context.Context) error {
 		}
 		// Always show task name for progress feedback.
 		fmt.Printf("=== %s\n", t.Name)
-		t.err = t.Action(ctx)
+		// Ensure args map exists (may be nil if SetArgs wasn't called).
+		if t.args == nil {
+			t.SetArgs(nil)
+		}
+		t.err = t.Action(ctx, t.args)
 	})
 	return t.err
 }

@@ -118,7 +118,7 @@ func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 		Name:   "go-all",
 		Usage:  "run all Go tasks",
 		Hidden: true,
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			// Format and lint run serially (they modify files).
 			if err := pocket.SerialDeps(ctx, formatTask, lintTask); err != nil {
 				return err
@@ -149,7 +149,7 @@ func FormatTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-format",
 		Usage: "format Go code (gofumpt, goimports, gci, golines)",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Format.ConfigFile
 				if configPath == "" {
@@ -179,7 +179,7 @@ func TestTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-test",
 		Usage: "run Go tests",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				args := []string{"test"}
 				if pocket.IsVerbose(ctx) {
@@ -209,7 +209,7 @@ func LintTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-lint",
 		Usage: "run golangci-lint",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Lint.ConfigFile
 				if configPath == "" {
@@ -246,7 +246,7 @@ func VulncheckTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-vulncheck",
 		Usage: "run govulncheck",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod := range modules {
 				cmd, err := govulncheck.Command(ctx, "./...")
 				if err != nil {

@@ -72,7 +72,7 @@ func New(cfg pocket.Config, ctxPath string) *Tasks {
 	t.All = &pocket.Task{
 		Name:  "all",
 		Usage: "run all tasks",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			// Generate first.
 			if err := pocket.SerialDeps(ctx, t.Generate); err != nil {
 				return err

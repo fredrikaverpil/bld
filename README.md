@@ -137,7 +137,7 @@ golang.New(map[string]golang.Options{
 
 ### Custom Tasks
 
-Add your own tasks in `.pocket/mytask.go`:
+Add your own tasks in `.pocket/config.go`:
 
 ```go
 import (
@@ -156,7 +156,7 @@ var Config = pocket.Config{
             {
                 Name:  "deploy",
                 Usage: "deploy to production",
-                Action: func(ctx context.Context) error {
+                Action: func(ctx context.Context, args map[string]string) error {
                     fmt.Println("Deploying...")
                     // your logic here
                     return nil
@@ -168,6 +168,30 @@ var Config = pocket.Config{
 ```
 
 Custom tasks appear in `./pok -h` and run as part of `./pok all`.
+
+**Tasks with arguments:**
+
+Tasks can declare arguments that users pass via `key=value` syntax:
+
+```go
+var greetTask = &pocket.Task{
+    Name:  "greet",
+    Usage: "print a greeting",
+    Args: []pocket.ArgDef{
+        {Name: "name", Usage: "who to greet", Default: "world"},
+    },
+    Action: func(ctx context.Context, args map[string]string) error {
+        fmt.Printf("Hello, %s!\n", args["name"])
+        return nil
+    },
+}
+```
+
+```bash
+./pok greet              # Hello, world!
+./pok greet name=Freddy  # Hello, Freddy!
+./pok -h greet           # show task help with arguments
+```
 
 For multi-module projects, you can define context-specific tasks that only
 appear when running the shim from that folder:

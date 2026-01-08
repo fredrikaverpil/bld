@@ -83,7 +83,7 @@ func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 		Name:   "lua-all",
 		Usage:  "run all Lua tasks",
 		Hidden: true,
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			return pocket.SerialDeps(ctx, formatTask)
 		},
 	}
@@ -109,7 +109,7 @@ func FormatTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "lua-format",
 		Usage: "format Lua files",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Format.ConfigFile
 				if configPath == "" {

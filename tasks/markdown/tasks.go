@@ -82,7 +82,7 @@ func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 		Name:   "md-all",
 		Usage:  "run all Markdown tasks",
 		Hidden: true,
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			return pocket.SerialDeps(ctx, formatTask)
 		},
 	}
@@ -108,7 +108,7 @@ func FormatTask(modules map[string]Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "md-format",
 		Usage: "format Markdown files",
-		Action: func(ctx context.Context) error {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod := range modules {
 				if err := mdformat.Run(ctx, mod); err != nil {
 					return fmt.Errorf("mdformat format failed in %s: %w", mod, err)
