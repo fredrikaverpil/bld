@@ -17,7 +17,7 @@ import (
 const name = "basedpyright"
 
 // renovate: datasource=pypi depName=basedpyright
-const version = "1.37.0"
+const version = "1.37.1"
 
 // pythonVersion specifies the Python version for the virtual environment.
 const pythonVersion = "3.12"
