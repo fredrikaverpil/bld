@@ -19,7 +19,7 @@ import (
 const name = "ruff"
 
 // renovate: datasource=pypi depName=ruff
-const version = "0.14.0"
+const version = "0.14.11"
 
 // pythonVersion specifies the Python version for the virtual environment.
 const pythonVersion = "3.12"
