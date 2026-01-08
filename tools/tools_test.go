@@ -4,9 +4,12 @@ import (
 	"context"
 	"testing"
 
+	"github.com/fredrikaverpil/pocket/tools/basedpyright"
 	"github.com/fredrikaverpil/pocket/tools/golangcilint"
 	"github.com/fredrikaverpil/pocket/tools/govulncheck"
 	"github.com/fredrikaverpil/pocket/tools/mdformat"
+	"github.com/fredrikaverpil/pocket/tools/mypy"
+	"github.com/fredrikaverpil/pocket/tools/ruff"
 	"github.com/fredrikaverpil/pocket/tools/stylua"
 	"github.com/fredrikaverpil/pocket/tools/uv"
 )
@@ -21,6 +24,9 @@ var tools = []struct {
 	{"govulncheck", govulncheck.Prepare, govulncheck.Run, []string{"-version"}},
 	{"uv", uv.Prepare, uv.Run, []string{"--version"}},
 	{"mdformat", mdformat.Prepare, mdformat.Run, []string{"--version"}},
+	{"ruff", ruff.Prepare, ruff.Run, []string{"--version"}},
+	{"mypy", mypy.Prepare, mypy.Run, []string{"--version"}},
+	{"basedpyright", basedpyright.Prepare, basedpyright.Run, []string{"--version"}},
 	{"stylua", stylua.Prepare, stylua.Run, []string{"--version"}},
 }
 
