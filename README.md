@@ -24,10 +24,12 @@ An opinionated build system platform for Go projects, powered by
 - **Tool management**: Downloads and caches tools in `.pocket/`
 - **Simple invocation**: Just `./pok <task>` or `./pok -h` to list all tasks
 
-## Bootstrap a new project
+## Quickstart
 
-This is the only part of Pocket which requires you to have Go installed. Run the
-init command in your project root:
+### Bootstrap your project with Pocket
+
+This is the only part of Pocket which requires you to have Go installed (could
+be changed in the future). Run the init command in your project root:
 
 ```bash
 go run github.com/fredrikaverpil/pocket/cmd/pocket@latest init
@@ -48,18 +50,20 @@ This creates:
 
 Run `./pok -h` for a list of all possible tasks to run.
 
-### Shell alias (optional)
+Add task groups or tasks in `.pocket/config.go` as desired. More on that below.
 
-For even shorter commands, add an alias to your shell profile:
+> [!TIP]
+>
+> **Shim customization:** If you don't like `./pok`, configure a different name
+> in `.pocket/config.go`:
+>
+> ```go
+> Shim: &pocket.ShimConfig{Name: "build"}  // creates ./build instead
+> ```
+>
+> Or add a shell alias: `alias pok='./pok'`
 
-```bash
-# ~/.bashrc or ~/.zshrc
-alias pok='./pok'
-```
-
-Then run tasks with just `pok <task>`.
-
-### Configuration
+## Configuration
 
 Edit `.pocket/config.go` to configure task groups.
 
@@ -219,7 +223,6 @@ To add additional shim types after bootstrapping, update your
 ```go
 var Config = pocket.Config{
     Shim: &pocket.ShimConfig{
-        Name:       "pok",  // base name (default: "pok")
         Posix:      true,   // ./pok (bash) - default
         Windows:    true,   // pok.cmd (requires Go in PATH)
         PowerShell: true,   // pok.ps1 (can auto-download Go)
