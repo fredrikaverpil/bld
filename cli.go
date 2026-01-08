@@ -17,14 +17,14 @@ import (
 // It parses flags, handles -h/--help, and runs the specified task(s).
 // If no task is specified, defaultTask is run.
 //
-// pathMappings maps task names to their Paths configuration.
+// pathMappings maps task names to their PathFilter configuration.
 // Tasks not in pathMappings are only visible when running from the git root.
-func Main(tasks []*Task, defaultTask *Task, pathMappings map[string]*Paths) {
+func Main(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) {
 	os.Exit(run(tasks, defaultTask, pathMappings))
 }
 
 // run parses flags and runs tasks, returning the exit code.
-func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*Paths) int {
+func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) int {
 	verbose := flag.Bool("v", false, "verbose output")
 	help := flag.Bool("h", false, "show help")
 
@@ -152,7 +152,7 @@ func detectCwd() string {
 // filterTasksByCwd returns tasks visible in the given directory.
 // - Tasks with path mapping: visible if paths.RunsIn(cwd) returns true
 // - Tasks without path mapping: visible only at root (cwd == ".").
-func filterTasksByCwd(tasks []*Task, cwd string, pathMappings map[string]*Paths) []*Task {
+func filterTasksByCwd(tasks []*Task, cwd string, pathMappings map[string]*PathFilter) []*Task {
 	var result []*Task
 	for _, t := range tasks {
 		if isTaskVisibleIn(t.Name, cwd, pathMappings) {
@@ -163,7 +163,7 @@ func filterTasksByCwd(tasks []*Task, cwd string, pathMappings map[string]*Paths)
 }
 
 // isTaskVisibleIn returns true if a task should be visible in the given directory.
-func isTaskVisibleIn(taskName, cwd string, pathMappings map[string]*Paths) bool {
+func isTaskVisibleIn(taskName, cwd string, pathMappings map[string]*PathFilter) bool {
 	if paths, ok := pathMappings[taskName]; ok {
 		return paths.RunsIn(cwd)
 	}

@@ -11,7 +11,7 @@ import (
 
 // Tasks returns a Runnable that executes all Lua tasks.
 // Runs from repository root since Lua files are typically scattered.
-// Use pocket.P(lua.Tasks()).Detect() to enable path filtering.
+// Use pocket.AutoDetect(lua.Tasks()) to enable path filtering.
 func Tasks() pocket.Runnable {
 	return &luaTasks{
 		format: FormatTask(),

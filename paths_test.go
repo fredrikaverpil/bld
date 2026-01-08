@@ -30,7 +30,7 @@ func (m *mockDetectable) DefaultDetect() func() []string {
 
 func TestPaths_In(t *testing.T) {
 	r := &mockRunnable{}
-	p := P(r).In("proj1", "proj2")
+	p := Paths(r).In("proj1", "proj2")
 
 	resolved := p.Resolve()
 	if len(resolved) != 2 {
@@ -53,7 +53,7 @@ func TestPaths_Except(t *testing.T) {
 			return []string{"proj1", "proj2", "vendor"}
 		},
 	}
-	p := P(r).Detect().Except("vendor")
+	p := Paths(r).Detect().Except("vendor")
 
 	resolved := p.Resolve()
 	if len(resolved) != 2 {
@@ -66,7 +66,7 @@ func TestPaths_Except(t *testing.T) {
 
 func TestPaths_DetectBy(t *testing.T) {
 	r := &mockRunnable{}
-	p := P(r).DetectBy(func() []string {
+	p := Paths(r).DetectBy(func() []string {
 		return []string{"a", "b", "c"}
 	})
 
@@ -82,7 +82,7 @@ func TestPaths_Detect_WithDetectable(t *testing.T) {
 			return []string{"mod1", "mod2"}
 		},
 	}
-	p := P(r).Detect()
+	p := Paths(r).Detect()
 
 	resolved := p.Resolve()
 	if len(resolved) != 2 {
@@ -92,7 +92,7 @@ func TestPaths_Detect_WithDetectable(t *testing.T) {
 
 func TestPaths_Detect_WithoutDetectable(t *testing.T) {
 	r := &mockRunnable{} // doesn't implement Detectable
-	p := P(r).Detect()
+	p := Paths(r).Detect()
 
 	resolved := p.Resolve()
 	if len(resolved) != 0 {
@@ -106,7 +106,7 @@ func TestPaths_CombineDetectAndInclude(t *testing.T) {
 			return []string{"detected1", "detected2"}
 		},
 	}
-	p := P(r).Detect().In("detected1") // filter to only detected1
+	p := Paths(r).Detect().In("detected1") // filter to only detected1
 
 	resolved := p.Resolve()
 	if len(resolved) != 1 {
@@ -119,7 +119,7 @@ func TestPaths_CombineDetectAndInclude(t *testing.T) {
 
 func TestPaths_Immutability(t *testing.T) {
 	r := &mockRunnable{}
-	p1 := P(r).In("proj1")
+	p1 := Paths(r).In("proj1")
 	p2 := p1.In("proj2")
 
 	// p1 should still only have proj1
@@ -135,7 +135,7 @@ func TestPaths_Immutability(t *testing.T) {
 func TestPaths_Tasks(t *testing.T) {
 	task1 := &Task{Name: "test-task"}
 	r := &mockRunnable{tasks: []*Task{task1}}
-	p := P(r).In(".")
+	p := Paths(r).In(".")
 
 	tasks := p.Tasks()
 	if len(tasks) != 1 {
@@ -152,7 +152,7 @@ func TestPaths_RegexPatterns(t *testing.T) {
 			return []string{"services/api", "services/web", "tools/cli"}
 		},
 	}
-	p := P(r).Detect().In("services/.*")
+	p := Paths(r).Detect().In("services/.*")
 
 	resolved := p.Resolve()
 	if len(resolved) != 2 {
@@ -168,7 +168,7 @@ func TestPaths_RegexPatterns(t *testing.T) {
 
 func TestPaths_RootOnly(t *testing.T) {
 	r := &mockRunnable{}
-	p := P(r).In(".")
+	p := Paths(r).In(".")
 
 	if !p.RunsIn(".") {
 		t.Error("expected RunsIn(.) to be true")
@@ -189,8 +189,8 @@ func TestCollectPathMappings(t *testing.T) {
 		detectFn:     func() []string { return []string{"proj1", "proj2"} },
 	}
 
-	// Wrap with P().Detect().
-	wrapped := P(detectable).Detect()
+	// Wrap with Paths().Detect().
+	wrapped := Paths(detectable).Detect()
 
 	// Create a serial runnable with wrapped and unwrapped tasks.
 	runnable := Serial(wrapped, task3)
@@ -222,7 +222,7 @@ func TestCollectModuleDirectories(t *testing.T) {
 	detectable := &mockDetectable{
 		detectFn: func() []string { return []string{"proj1", "proj2"} },
 	}
-	wrapped := P(detectable).Detect()
+	wrapped := Paths(detectable).Detect()
 
 	dirs := CollectModuleDirectories(wrapped)
 

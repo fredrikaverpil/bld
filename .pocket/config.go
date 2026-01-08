@@ -11,8 +11,8 @@ import (
 
 var Config = pocket.Config{
 	Run: pocket.Serial(
-		pocket.P(golang.Tasks()).Detect(),
-		pocket.P(markdown.Tasks()).Detect(),
+		pocket.AutoDetect(golang.Tasks()),
+		pocket.AutoDetect(markdown.Tasks()),
 		greetTask,
 	),
 	Shim: &pocket.ShimConfig{

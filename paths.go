@@ -6,15 +6,22 @@ import (
 	"slices"
 )
 
-// P wraps a Runnable with path filtering capabilities.
-// The returned *Paths can be configured with builder methods.
-func P(r Runnable) *Paths {
-	return &Paths{inner: r}
+// Paths wraps a Runnable with path filtering capabilities.
+// The returned *PathFilter can be configured with builder methods.
+func Paths(r Runnable) *PathFilter {
+	return &PathFilter{inner: r}
 }
 
-// Paths wraps a Runnable with path filtering.
+// AutoDetect wraps a Runnable with automatic directory detection.
+// This is a convenience function equivalent to Paths(r).Detect().
+// The Runnable should implement Detectable for this to work.
+func AutoDetect(r Runnable) *PathFilter {
+	return Paths(r).Detect()
+}
+
+// PathFilter wraps a Runnable with path filtering.
 // It implements Runnable, so it can be used anywhere a Runnable is expected.
-type Paths struct {
+type PathFilter struct {
 	inner   Runnable
 	include []*regexp.Regexp // explicit include patterns
 	exclude []*regexp.Regexp // exclusion patterns
@@ -23,8 +30,8 @@ type Paths struct {
 
 // In adds include patterns (regexp).
 // Directories matching any pattern are included.
-// Returns a new *Paths (immutable).
-func (p *Paths) In(patterns ...string) *Paths {
+// Returns a new *PathFilter (immutable).
+func (p *PathFilter) In(patterns ...string) *PathFilter {
 	cp := p.clone()
 	for _, pat := range patterns {
 		cp.include = append(cp.include, regexp.MustCompile("^"+pat+"$"))
@@ -33,14 +40,14 @@ func (p *Paths) In(patterns ...string) *Paths {
 }
 
 // Include is an alias for In.
-func (p *Paths) Include(patterns ...string) *Paths {
+func (p *PathFilter) Include(patterns ...string) *PathFilter {
 	return p.In(patterns...)
 }
 
 // Except adds exclude patterns (regexp).
 // Directories matching any pattern are excluded from results.
-// Returns a new *Paths (immutable).
-func (p *Paths) Except(patterns ...string) *Paths {
+// Returns a new *PathFilter (immutable).
+func (p *PathFilter) Except(patterns ...string) *PathFilter {
 	cp := p.clone()
 	for _, pat := range patterns {
 		cp.exclude = append(cp.exclude, regexp.MustCompile("^"+pat+"$"))
@@ -50,8 +57,8 @@ func (p *Paths) Except(patterns ...string) *Paths {
 
 // Detect enables detection using the inner Runnable's DefaultDetect method.
 // If the inner Runnable doesn't implement Detectable, this has no effect.
-// Returns a new *Paths (immutable).
-func (p *Paths) Detect() *Paths {
+// Returns a new *PathFilter (immutable).
+func (p *PathFilter) Detect() *PathFilter {
 	cp := p.clone()
 	if d, ok := cp.inner.(Detectable); ok {
 		cp.detect = d.DefaultDetect()
@@ -61,8 +68,8 @@ func (p *Paths) Detect() *Paths {
 
 // DetectBy sets a custom detection function.
 // The function should return directories relative to git root.
-// Returns a new *Paths (immutable).
-func (p *Paths) DetectBy(fn func() []string) *Paths {
+// Returns a new *PathFilter (immutable).
+func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 	cp := p.clone()
 	cp.detect = fn
 	return cp
@@ -71,7 +78,7 @@ func (p *Paths) DetectBy(fn func() []string) *Paths {
 // Resolve returns all directories where this Runnable should run.
 // It combines detection results with explicit includes, then filters by excludes.
 // Results are sorted and deduplicated.
-func (p *Paths) Resolve() []string {
+func (p *PathFilter) Resolve() []string {
 	seen := make(map[string]bool)
 
 	// Add detected directories.
@@ -119,25 +126,25 @@ func (p *Paths) Resolve() []string {
 
 // RunsIn returns true if this Runnable should run in the given directory.
 // The directory should be relative to git root.
-func (p *Paths) RunsIn(dir string) bool {
+func (p *PathFilter) RunsIn(dir string) bool {
 	resolved := p.Resolve()
 	return slices.Contains(resolved, dir)
 }
 
 // Run executes the inner Runnable.
 // Path filtering happens at CLI level, not during Run.
-func (p *Paths) Run(ctx context.Context) error {
+func (p *PathFilter) Run(ctx context.Context) error {
 	return p.inner.Run(ctx)
 }
 
 // Tasks returns all tasks from the inner Runnable.
-func (p *Paths) Tasks() []*Task {
+func (p *PathFilter) Tasks() []*Task {
 	return p.inner.Tasks()
 }
 
-// clone creates a shallow copy of Paths for immutability.
-func (p *Paths) clone() *Paths {
-	return &Paths{
+// clone creates a shallow copy of PathFilter for immutability.
+func (p *PathFilter) clone() *PathFilter {
+	return &PathFilter{
 		inner:   p.inner,
 		include: slices.Clone(p.include),
 		exclude: slices.Clone(p.exclude),
@@ -147,7 +154,7 @@ func (p *Paths) clone() *Paths {
 
 // matches checks if a directory matches the include patterns.
 // If no include patterns are specified, all directories match.
-func (p *Paths) matches(dir string) bool {
+func (p *PathFilter) matches(dir string) bool {
 	if len(p.include) == 0 {
 		return !p.isExcluded(dir)
 	}
@@ -160,7 +167,7 @@ func (p *Paths) matches(dir string) bool {
 }
 
 // isExcluded checks if a directory matches any exclude pattern.
-func (p *Paths) isExcluded(dir string) bool {
+func (p *PathFilter) isExcluded(dir string) bool {
 	for _, re := range p.exclude {
 		if re.MatchString(dir) {
 			return true
@@ -185,10 +192,10 @@ func containsRegexMeta(s string) bool {
 	return false
 }
 
-// CollectPathMappings walks a Runnable tree and returns a map from task name to Paths.
-// Tasks not wrapped with Paths are not included in the map.
-func CollectPathMappings(r Runnable) map[string]*Paths {
-	result := make(map[string]*Paths)
+// CollectPathMappings walks a Runnable tree and returns a map from task name to PathFilter.
+// Tasks not wrapped with Paths() are not included in the map.
+func CollectPathMappings(r Runnable) map[string]*PathFilter {
+	result := make(map[string]*PathFilter)
 	collectPathMappingsRecursive(r, result, nil)
 	return result
 }
@@ -214,8 +221,8 @@ func collectModuleDirectoriesRecursive(r Runnable, seen map[string]bool) {
 		return
 	}
 
-	// Check if this is a Paths wrapper.
-	if p, ok := r.(*Paths); ok {
+	// Check if this is a PathFilter wrapper.
+	if p, ok := r.(*PathFilter); ok {
 		for _, dir := range p.Resolve() {
 			seen[dir] = true
 		}
@@ -233,13 +240,13 @@ func collectModuleDirectoriesRecursive(r Runnable, seen map[string]bool) {
 }
 
 // collectPathMappingsRecursive is the recursive helper for CollectPathMappings.
-func collectPathMappingsRecursive(r Runnable, result map[string]*Paths, currentPaths *Paths) {
+func collectPathMappingsRecursive(r Runnable, result map[string]*PathFilter, currentPaths *PathFilter) {
 	if r == nil {
 		return
 	}
 
-	// Check if this is a Paths wrapper.
-	if p, ok := r.(*Paths); ok {
+	// Check if this is a PathFilter wrapper.
+	if p, ok := r.(*PathFilter); ok {
 		currentPaths = p
 		// Continue with the inner runnable.
 		collectPathMappingsRecursive(p.inner, result, currentPaths)

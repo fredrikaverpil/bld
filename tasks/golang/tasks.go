@@ -12,7 +12,7 @@ import (
 
 // Tasks returns a Runnable that executes all Go tasks.
 // Tasks auto-detect Go modules by finding go.mod files.
-// Use pocket.P(golang.Tasks()).Detect() to enable path filtering.
+// Use pocket.AutoDetect(golang.Tasks()) to enable path filtering.
 func Tasks() pocket.Runnable {
 	return &goTasks{
 		format:    FormatTask(),

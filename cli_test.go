@@ -105,9 +105,9 @@ func TestFilterTasksByCwd(t *testing.T) {
 
 	// Create path mappings.
 	// task1 runs in proj1, task2 runs in root.
-	mappings := map[string]*Paths{
-		"task1": P(&cliMockRunnable{}).In("proj1"),
-		"task2": P(&cliMockRunnable{}).In("."),
+	mappings := map[string]*PathFilter{
+		"task1": Paths(&cliMockRunnable{}).In("proj1"),
+		"task2": Paths(&cliMockRunnable{}).In("."),
 	}
 
 	tasks := []*Task{task1, task2, task3}
@@ -136,9 +136,9 @@ func TestFilterTasksByCwd(t *testing.T) {
 }
 
 func TestIsTaskVisibleIn(t *testing.T) {
-	mappings := map[string]*Paths{
-		"task1": P(&cliMockRunnable{}).In("proj1", "proj2"),
-		"task2": P(&cliMockRunnable{}).In("."),
+	mappings := map[string]*PathFilter{
+		"task1": Paths(&cliMockRunnable{}).In("proj1", "proj2"),
+		"task2": Paths(&cliMockRunnable{}).In("."),
 	}
 
 	tests := []struct {

@@ -74,75 +74,9 @@ This creates:
 
 ## Configuration
 
-Edit `.pocket/config.go` to configure tasks.
+Edit `.pocket/config.go` to define your tasks.
 
-**Basic configuration with auto-detection:**
-
-```go
-import (
-    "github.com/fredrikaverpil/pocket"
-    "github.com/fredrikaverpil/pocket/tasks/golang"
-    "github.com/fredrikaverpil/pocket/tasks/python"
-    "github.com/fredrikaverpil/pocket/tasks/markdown"
-)
-
-var Config = pocket.Config{
-    Run: pocket.Serial(
-        pocket.P(golang.Tasks()).Detect(),    // auto-detects Go modules (go.mod)
-        pocket.P(python.Tasks()).Detect(),    // auto-detects Python projects
-        pocket.P(markdown.Tasks()).Detect(),  // formats markdown from root
-    ),
-}
-```
-
-**Path filtering with explicit paths:**
-
-```go
-var Config = pocket.Config{
-    Run: pocket.Serial(
-        // Only run Go tasks in specific directories
-        pocket.P(golang.Tasks()).In("proj1", "proj2"),
-
-        // Auto-detect but exclude certain directories
-        pocket.P(python.Tasks()).Detect().Except("vendor", `\.pocket`),
-
-        // Run markdown tasks only at root
-        pocket.P(markdown.Tasks()).In("."),
-    ),
-}
-```
-
-**Regex patterns for path matching:**
-
-```go
-var Config = pocket.Config{
-    Run: pocket.Serial(
-        // Match all services subdirectories
-        pocket.P(golang.Tasks()).Detect().In("services/.*"),
-
-        // Exclude test directories
-        pocket.P(python.Tasks()).Detect().Except(".*_test", "testdata"),
-    ),
-}
-```
-
-**Parallel execution:**
-
-```go
-var Config = pocket.Config{
-    Run: pocket.Serial(
-        pocket.P(golang.Tasks()).Detect(),  // run first
-        pocket.Parallel(                     // then these in parallel
-            pocket.P(python.Tasks()).Detect(),
-            pocket.P(markdown.Tasks()).Detect(),
-        ),
-    ),
-}
-```
-
-### Custom Tasks
-
-Add your own tasks in `.pocket/config.go`:
+### Defining Tasks
 
 ```go
 import (
@@ -150,67 +84,115 @@ import (
     "fmt"
 
     "github.com/fredrikaverpil/pocket"
-    "github.com/fredrikaverpil/pocket/tasks/golang"
 )
 
 var Config = pocket.Config{
     Run: pocket.Serial(
-        pocket.P(golang.Tasks()).Detect(),
-        deployTask,  // custom task runs at root only (no P() wrapper)
+        lintTask,
+        testTask,
+        buildTask,
     ),
 }
 
-var deployTask = &pocket.Task{
-    Name:  "deploy",
-    Usage: "deploy to production",
+var lintTask = &pocket.Task{
+    Name:  "lint",
+    Usage: "run linter",
     Action: func(ctx context.Context, args map[string]string) error {
-        fmt.Println("Deploying...")
-        // your logic here
-        return nil
+        cmd := pocket.Command(ctx, "golangci-lint", "run", "./...")
+        return cmd.Run()
+    },
+}
+
+var testTask = &pocket.Task{
+    Name:  "test",
+    Usage: "run tests",
+    Action: func(ctx context.Context, args map[string]string) error {
+        cmd := pocket.Command(ctx, "go", "test", "./...")
+        return cmd.Run()
+    },
+}
+
+var buildTask = &pocket.Task{
+    Name:  "build",
+    Usage: "build the project",
+    Action: func(ctx context.Context, args map[string]string) error {
+        fmt.Println("Building...")
+        cmd := pocket.Command(ctx, "go", "build", "./...")
+        return cmd.Run()
     },
 }
 ```
 
-Custom tasks appear in `./pok -h` and run as part of `./pok` (no args).
+Tasks appear in `./pok -h` and run as part of `./pok` (no args).
 
-> [!NOTE]
->
-> Tasks without a `P()` wrapper are only visible when running from the git root.
-> Use `pocket.P(myTask).In("subdir")` to make a task visible in specific
-> directories.
-
-**Tasks with arguments:**
+### Tasks with Arguments
 
 Tasks can declare arguments that users pass via `key=value` syntax:
 
 ```go
-var greetTask = &pocket.Task{
-    Name:  "greet",
-    Usage: "print a greeting",
+var deployTask = &pocket.Task{
+    Name:  "deploy",
+    Usage: "deploy to environment",
     Args: []pocket.ArgDef{
-        {Name: "name", Usage: "who to greet", Default: "world"},
+        {Name: "env", Usage: "target environment", Default: "staging"},
     },
     Action: func(ctx context.Context, args map[string]string) error {
-        fmt.Printf("Hello, %s!\n", args["name"])
+        fmt.Printf("Deploying to %s...\n", args["env"])
         return nil
     },
 }
 ```
 
 ```bash
-./pok greet              # Hello, world!
-./pok greet name=Freddy  # Hello, Freddy!
-./pok -h greet           # show task help with arguments
+./pok deploy              # Deploying to staging...
+./pok deploy env=prod     # Deploying to prod...
+./pok -h deploy           # show task help with arguments
 ```
 
-For multi-module projects, you can define context-specific tasks that only
-appear when running the shim from that folder:
+### Path Filtering (Multi-Directory Projects)
+
+For monorepos or multi-module projects, use `Paths()` to control where tasks are
+visible:
 
 ```go
 var Config = pocket.Config{
     Run: pocket.Serial(
-        rootTask,                              // visible at root only
-        pocket.P(apiTask).In("services/api"),  // visible in services/api/
+        rootTask,                                  // visible at root only
+        pocket.Paths(apiTask).In("services/api"),  // visible in services/api/
+        pocket.Paths(webTask).In("services/web"),  // visible in services/web/
+    ),
+}
+```
+
+Tasks are visible based on the current working directory:
+
+- Without `Paths()` wrapper: only visible at git root
+- With `Paths().In(...)`: visible in specified directories (supports regex)
+
+```go
+// Run in multiple directories
+pocket.Paths(myTask).In("proj1", "proj2")
+
+// Match patterns (regex)
+pocket.Paths(myTask).In("services/.*")
+
+// Exclude directories
+pocket.Paths(myTask).In("services/.*").Except("services/legacy")
+```
+
+### Execution Order
+
+Use `Serial()` and `Parallel()` to control execution:
+
+```go
+var Config = pocket.Config{
+    Run: pocket.Serial(
+        formatTask,           // run first
+        pocket.Parallel(      // then these in parallel
+            lintTask,
+            testTask,
+        ),
+        buildTask,            // run last
     ),
 }
 ```
@@ -297,6 +279,48 @@ rem PowerShell
 .\pok.ps1 go-test
 ```
 
+### Built-in Task Packages (Optional)
+
+Pocket includes opinionated task packages for common languages. These use
+auto-detection to find project directories:
+
+```go
+import (
+    "github.com/fredrikaverpil/pocket"
+    "github.com/fredrikaverpil/pocket/tasks/golang"
+    "github.com/fredrikaverpil/pocket/tasks/python"
+    "github.com/fredrikaverpil/pocket/tasks/markdown"
+)
+
+var Config = pocket.Config{
+    Run: pocket.Serial(
+        pocket.AutoDetect(golang.Tasks()),    // finds go.mod files
+        pocket.AutoDetect(python.Tasks()),    // finds pyproject.toml
+        pocket.AutoDetect(markdown.Tasks()),  // formats markdown from root
+    ),
+}
+```
+
+Available packages:
+
+- `tasks/golang` - Go formatting (gofumpt, goimports), linting (golangci-lint),
+  testing, vulncheck
+- `tasks/python` - Python formatting and linting (ruff), type checking (mypy)
+- `tasks/markdown` - Markdown formatting (mdformat)
+- `tasks/lua` - Lua formatting (stylua)
+
+> [!TIP]
+>
+> You can combine `AutoDetect()` with path filtering methods:
+>
+> ```go
+> // Exclude directories from auto-detection
+> pocket.AutoDetect(golang.Tasks()).Except("vendor", "testdata")
+>
+> // Limit to specific subdirectories
+> pocket.AutoDetect(python.Tasks()).In("services/.*")
+> ```
+
 ## Terminology
 
 Pocket has three levels of configuration:
@@ -315,18 +339,19 @@ Config (project)
 
 ### Runnable
 
-- Anything that can be executed: `Task`, `Serial()`, `Parallel()`, or `Paths`
+- Anything that can be executed: `Task`, `Serial()`, `Parallel()`, or
+  `PathFilter`
 - `Serial(...)` runs children in order
 - `Parallel(...)` runs children concurrently
-- `P(runnable)` wraps a runnable with path filtering
+- `Paths(runnable)` wraps a runnable with path filtering
 
-### Paths (Path Filtering)
+### PathFilter (Path Filtering)
 
 - Wraps a Runnable with directory-based visibility
-- `P(r).Detect()` - auto-detect directories (using `DefaultDetect()`)
-- `P(r).In("dir1", "dir2")` - explicit directories (supports regex)
-- `P(r).Except("vendor")` - exclude directories
-- Tasks without `P()` wrapper are only visible at git root
+- `Paths(r).In("dir1", "dir2")` - visible in specified directories (supports
+  regex)
+- `Paths(r).Except("vendor")` - exclude directories from visibility
+- Tasks without `Paths()` wrapper are only visible at git root
 
 ### Task
 

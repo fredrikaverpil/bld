@@ -11,7 +11,7 @@ import (
 
 // Tasks returns a Runnable that executes all Markdown tasks.
 // Runs from repository root since markdown files are typically scattered.
-// Use pocket.P(markdown.Tasks()).Detect() to enable path filtering.
+// Use pocket.AutoDetect(markdown.Tasks()) to enable path filtering.
 func Tasks() pocket.Runnable {
 	return &mdTasks{
 		format: FormatTask(),

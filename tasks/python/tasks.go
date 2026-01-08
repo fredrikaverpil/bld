@@ -12,7 +12,7 @@ import (
 
 // Tasks returns a Runnable that executes all Python tasks.
 // Tasks auto-detect Python projects by finding pyproject.toml, setup.py, or setup.cfg.
-// Use pocket.P(python.Tasks()).Detect() to enable path filtering.
+// Use pocket.AutoDetect(python.Tasks()) to enable path filtering.
 func Tasks() pocket.Runnable {
 	return &pyTasks{
 		format:    FormatTask(),
