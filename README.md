@@ -256,7 +256,7 @@ Config (project)
               └── Task (executable unit of work)
 ```
 
-### Config (`pocket.Config`)
+### Config ([`config.go`](config.go))
 
 - Project-level configuration
 - Defines which task groups to use, custom tasks, and shim settings
@@ -269,11 +269,15 @@ Config (project)
 - Created with `golang.New(map[string]golang.Options{...})` or `golang.Auto()`
 - Controls which directories tasks run on
 
-### Options (`golang.Options`, etc.)
+### Options
 
 - Per-directory configuration within a task group
 - **Task selection**: `Skip` and `Only` control which tasks run
 - **Task behavior**: `Lint`, `Test`, `Format` etc. customize how tasks run
+
+Examples: [`golang.Options`](tasks/golang/tasks.go),
+[`python.Options`](tasks/python/tasks.go),
+[`markdown.Options`](tasks/markdown/tasks.go)
 
 ### Task
 
