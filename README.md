@@ -57,8 +57,8 @@ This creates:
 > [!NOTE]
 >
 > Pocket comes loaded with useful tasks and tools, but none enabled out of the
-> box. You have to explicitly define them in `.pocket/config.go` as desired.
-> More on that below.
+> box. You have to explicitly define them in `.pocket/config.go` as desired, or
+> make your own. More on that below.
 
 > [!TIP]
 >
