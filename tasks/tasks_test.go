@@ -70,7 +70,7 @@ func TestNew_GoTaskGroupConfigDriven(t *testing.T) {
 		{
 			name: "skip format excludes go-format",
 			taskGroup: golang.New(map[string]golang.Options{
-				".": {Skip: []string{"format"}},
+				".": {Skip: []string{"go-format"}},
 			}),
 			wantTasks:    []string{"go-lint", "go-test", "go-vulncheck"},
 			wantNotTasks: []string{"go-format"},
@@ -121,7 +121,7 @@ func TestNew_LuaTaskGroupConfigDriven(t *testing.T) {
 		{
 			name: "lua format skipped",
 			taskGroup: lua.New(map[string]lua.Options{
-				".": {Skip: []string{"format"}},
+				".": {Skip: []string{"lua-format"}},
 			}),
 			wantLuaFormat: false,
 		},
@@ -165,7 +165,7 @@ func TestNew_MarkdownTaskGroupConfigDriven(t *testing.T) {
 		{
 			name: "markdown format skipped",
 			taskGroup: markdown.New(map[string]markdown.Options{
-				".": {Skip: []string{"format"}},
+				".": {Skip: []string{"md-format"}},
 			}),
 			wantMdFormat: false,
 		},

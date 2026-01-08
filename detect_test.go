@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -119,8 +120,8 @@ func TestDetectByFile(t *testing.T) {
 	}
 }
 
-func TestAutoTaskGroup_Integration(t *testing.T) {
-	// Test that AutoTaskGroup correctly feeds detected modules to the config.
+func TestTaskPackage_Integration(t *testing.T) {
+	// Test that TaskPackage correctly feeds detected modules to the config.
 	// Not parallel due to shared gitRoot variable.
 
 	tmpDir := t.TempDir()
@@ -147,16 +148,17 @@ func TestAutoTaskGroup_Integration(t *testing.T) {
 	gitRoot = tmpDir
 	defer func() { gitRoot = origRoot }()
 
-	// Create an auto task group using the generic helper.
-	tg := NewAutoTaskGroup(
-		"go",
-		func() []string { return DetectByFile("go.mod") },
-		BaseModuleConfig{},
-		nil,
-		func(modules map[string]BaseModuleConfig) TaskGroup {
-			return &testTaskGroup{modules: modules}
+	// Create a TaskPackage and use Auto() to create a task group.
+	pkg := TaskPackage[testOptions]{
+		Name:   "test",
+		Detect: func() []string { return DetectByFile("go.mod") },
+		Tasks: []TaskDef[testOptions]{
+			{Name: "test-task", Create: func(_ map[string]testOptions) *Task {
+				return &Task{Name: "test-task", Usage: "test"}
+			}},
 		},
-	)
+	}
+	tg := pkg.Auto()
 
 	// Verify modules are detected.
 	modules := tg.Modules()
@@ -181,31 +183,13 @@ func TestAutoTaskGroup_Integration(t *testing.T) {
 	}
 }
 
-// testTaskGroup is a simple TaskGroup for testing.
-type testTaskGroup struct {
-	modules map[string]BaseModuleConfig
+// testOptions is a simple Options type for testing.
+type testOptions struct {
+	Skip []string
 }
 
-func (tg *testTaskGroup) Name() string { return "test" }
-
-func (tg *testTaskGroup) Modules() map[string]ModuleConfig {
-	result := make(map[string]ModuleConfig, len(tg.modules))
-	for k, v := range tg.modules {
-		result[k] = v
-	}
-	return result
-}
-
-func (tg *testTaskGroup) Tasks(_ Config) []*Task { return nil }
-
-func (tg *testTaskGroup) ForContext(context string) TaskGroup {
-	if context == "." {
-		return tg
-	}
-	if opts, ok := tg.modules[context]; ok {
-		return &testTaskGroup{modules: map[string]BaseModuleConfig{context: opts}}
-	}
-	return nil
+func (o testOptions) ShouldRun(taskName string) bool {
+	return !slices.Contains(o.Skip, taskName)
 }
 
 func TestDetectByExtension(t *testing.T) {

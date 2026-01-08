@@ -11,15 +11,10 @@ import (
 	"github.com/fredrikaverpil/pocket/tools/ruff"
 )
 
-const name = "python"
-
 // Options defines options for a Python module within a task group.
 type Options struct {
-	// Skip lists task names to skip (e.g., "format", "lint", "typecheck").
+	// Skip lists full task names to skip (e.g., "py-format", "py-lint", "py-typecheck").
 	Skip []string
-	// Only lists task names to run (empty = run all).
-	// If non-empty, only these tasks run (Skip is ignored).
-	Only []string
 
 	// Task-specific options
 	Format    FormatOptions
@@ -27,12 +22,9 @@ type Options struct {
 	Typecheck TypecheckOptions
 }
 
-// ShouldRun returns true if the given task should run based on Skip/Only options.
-func (o Options) ShouldRun(task string) bool {
-	if len(o.Only) > 0 {
-		return slices.Contains(o.Only, task)
-	}
-	return !slices.Contains(o.Skip, task)
+// ShouldRun returns true if the given task should run based on the Skip list.
+func (o Options) ShouldRun(taskName string) bool {
+	return !slices.Contains(o.Skip, taskName)
 }
 
 // FormatOptions defines options for the format task.
@@ -52,84 +44,27 @@ type TypecheckOptions struct {
 	// placeholder for future options
 }
 
-// New creates a Python task group with the given module configuration.
+// Package defines the Python task package.
+var Package = pocket.TaskPackage[Options]{
+	Name:   "python",
+	Detect: func() []string { return pocket.DetectByFile("pyproject.toml", "setup.py", "setup.cfg") },
+	Tasks: []pocket.TaskDef[Options]{
+		{Name: "py-format", Create: FormatTask},
+		{Name: "py-lint", Create: LintTask},
+		{Name: "py-typecheck", Create: TypecheckTask},
+	},
+}
+
+// Auto creates a Python task group that auto-detects modules by finding
+// pyproject.toml, setup.py, or setup.cfg files.
+// Skip patterns can be passed to exclude paths or specific tasks.
+func Auto(opts ...pocket.SkipOption) pocket.TaskGroup {
+	return Package.Auto(opts...)
+}
+
+// New creates a Python task group with explicit module configuration.
 func New(modules map[string]Options) pocket.TaskGroup {
-	return &taskGroup{modules: modules}
-}
-
-type taskGroup struct {
-	modules map[string]Options
-}
-
-func (tg *taskGroup) Name() string { return name }
-
-func (tg *taskGroup) Modules() map[string]pocket.ModuleConfig {
-	modules := make(map[string]pocket.ModuleConfig, len(tg.modules))
-	for path, opts := range tg.modules {
-		modules[path] = opts
-	}
-	return modules
-}
-
-func (tg *taskGroup) ForContext(context string) pocket.TaskGroup {
-	if context == "." {
-		return tg
-	}
-	if opts, ok := tg.modules[context]; ok {
-		return &taskGroup{modules: map[string]Options{context: opts}}
-	}
-	return nil
-}
-
-func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
-	_ = cfg.WithDefaults()
-	var tasks []*pocket.Task
-
-	var formatTask, lintTask, typecheckTask *pocket.Task
-
-	if mods := tg.modulesFor("format"); len(mods) > 0 {
-		formatTask = FormatTask(mods)
-		tasks = append(tasks, formatTask)
-	}
-
-	if mods := tg.modulesFor("lint"); len(mods) > 0 {
-		lintTask = LintTask(mods)
-		tasks = append(tasks, lintTask)
-	}
-
-	if mods := tg.modulesFor("typecheck"); len(mods) > 0 {
-		typecheckTask = TypecheckTask(mods)
-		tasks = append(tasks, typecheckTask)
-	}
-
-	// Create orchestrator task that controls execution order.
-	allTask := &pocket.Task{
-		Name:   "py-all",
-		Usage:  "run all Python tasks",
-		Hidden: true,
-		Action: func(ctx context.Context, _ map[string]string) error {
-			// Format and lint run serially (they modify files).
-			if err := pocket.SerialDeps(ctx, formatTask, lintTask); err != nil {
-				return err
-			}
-			// Typecheck runs after format/lint.
-			return pocket.SerialDeps(ctx, typecheckTask)
-		},
-	}
-	tasks = append(tasks, allTask)
-
-	return tasks
-}
-
-// modulesFor returns modules with their task-specific options for a given task.
-func (tg *taskGroup) modulesFor(task string) map[string]Options {
-	result := make(map[string]Options)
-	for path, opts := range tg.modules {
-		if opts.ShouldRun(task) {
-			result[path] = opts
-		}
-	}
-	return result
+	return Package.New(modules)
 }
 
 // FormatTask returns a task that formats Python files using ruff format.

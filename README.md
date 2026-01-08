@@ -95,17 +95,13 @@ var Config = pocket.Config{
 }
 ```
 
-**Auto-detection with options:**
+**Auto-detection with skip patterns:**
 
 ```go
-golang.Auto(golang.AutoConfig{
-    // Default options for all detected modules
-    Options: golang.Options{Skip: []string{"vulncheck"}},
-    // Override specific paths
-    Overrides: map[string]golang.Options{
-        ".pocket": {Only: []string{"format"}},
-    },
-})
+golang.Auto(
+    pocket.SkipPath(`\.pocket`),            // skip all tasks in .pocket/
+    pocket.SkipTask("go-vulncheck", `.*`),  // skip vulncheck everywhere
+)
 ```
 
 **Explicit configuration:**
@@ -114,9 +110,8 @@ golang.Auto(golang.AutoConfig{
 var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{
         golang.New(map[string]golang.Options{
-            ".":          {},                           // all tasks enabled
-            "subdir/lib": {Skip: []string{"format"}},   // skip format for this module
-            "generated":  {Only: []string{"test"}},     // only run test for generated code
+            ".":          {},                              // all tasks enabled
+            "subdir/lib": {Skip: []string{"go-format"}},   // skip format for this module
         }),
     },
 }
@@ -130,7 +125,7 @@ golang.New(map[string]golang.Options{
         Lint: golang.LintOptions{ConfigFile: "proj1/.golangci.yml"},
     },
     "proj2": {
-        Skip: []string{"test"},  // skip tests for this module
+        Skip: []string{"go-test"},  // skip tests for this module
     },
 })
 ```
@@ -312,7 +307,8 @@ Config (project)
 ### Options
 
 - Per-directory configuration within a task group
-- **Task selection**: `Skip` and `Only` control which tasks run
+- **Task selection**: `Skip` controls which tasks to exclude (uses full task
+  names like `"go-lint"`, `"go-test"`)
 - **Task behavior**: `Lint`, `Test`, `Format` etc. customize how tasks run
 
 Examples: [`golang.Options`](tasks/golang/tasks.go),
@@ -324,6 +320,61 @@ Examples: [`golang.Options`](tasks/golang/tasks.go),
 - Executable unit of work: `go-format`, `go-lint`, `py-typecheck`...
 - Runs on one or more directories
 - Can be used standalone: `golang.LintTask(map[string]golang.Options{...})`
+
+## Convenience Functions
+
+Pocket provides helpers for writing custom tasks:
+
+**Path helpers:**
+
+```go
+pocket.GitRoot()              // returns git repository root path
+pocket.FromGitRoot("subdir")  // joins paths relative to git root
+pocket.FromPocketDir("file")  // joins paths relative to .pocket/
+pocket.FromBinDir("tool")     // joins paths relative to .pocket/bin/
+pocket.BinaryName("mytool")   // appends .exe on Windows
+```
+
+**Execution helpers:**
+
+```go
+// Creates exec.Cmd with PATH including .pocket/bin/
+cmd := pocket.Command(ctx, "go", "build", "./...")
+cmd.Dir = pocket.FromGitRoot("subdir")
+cmd.Run()
+```
+
+**Detection helpers (for Auto mode):**
+
+```go
+pocket.DetectByFile("go.mod")        // finds dirs with go.mod
+pocket.DetectByExtension(".lua")     // finds dirs with .lua files
+```
+
+**Task orchestration:**
+
+```go
+// Run tasks in parallel
+pocket.Deps(ctx, formatTask, lintTask)
+
+// Run tasks sequentially
+pocket.SerialDeps(ctx, formatTask, lintTask, testTask)
+
+// Check verbose mode
+if pocket.IsVerbose(ctx) {
+    args = append(args, "-v")
+}
+```
+
+**Skip options (for Auto mode):**
+
+```go
+golang.Auto(
+    pocket.SkipPath(`\.pocket`),           // skip all tasks for matching paths
+    pocket.SkipTask("go-vulncheck", `.*`), // skip specific task for matching paths
+    pocket.ShowAll(),                       // make go-all visible in help
+)
+```
 
 ## Acknowledgements
 

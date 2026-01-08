@@ -10,26 +10,18 @@ import (
 	"github.com/fredrikaverpil/pocket/tools/stylua"
 )
 
-const name = "lua"
-
 // Options defines options for a Lua module within a task group.
 type Options struct {
-	// Skip lists task names to skip (e.g., "format").
+	// Skip lists full task names to skip (e.g., "lua-format").
 	Skip []string
-	// Only lists task names to run (empty = run all).
-	// If non-empty, only these tasks run (Skip is ignored).
-	Only []string
 
 	// Task-specific options
 	Format FormatOptions
 }
 
-// ShouldRun returns true if the given task should run based on Skip/Only options.
-func (o Options) ShouldRun(task string) bool {
-	if len(o.Only) > 0 {
-		return slices.Contains(o.Only, task)
-	}
-	return !slices.Contains(o.Skip, task)
+// ShouldRun returns true if the given task should run based on the Skip list.
+func (o Options) ShouldRun(taskName string) bool {
+	return !slices.Contains(o.Skip, taskName)
 }
 
 // FormatOptions defines options for the format task.
@@ -38,69 +30,24 @@ type FormatOptions struct {
 	ConfigFile string
 }
 
-// New creates a Lua task group with the given module configuration.
+// Package defines the Lua task package.
+var Package = pocket.TaskPackage[Options]{
+	Name:   "lua",
+	Detect: func() []string { return pocket.DetectByExtension(".lua") },
+	Tasks: []pocket.TaskDef[Options]{
+		{Name: "lua-format", Create: FormatTask},
+	},
+}
+
+// Auto creates a Lua task group that auto-detects modules by finding directories with .lua files.
+// Skip patterns can be passed to exclude paths or specific tasks.
+func Auto(opts ...pocket.SkipOption) pocket.TaskGroup {
+	return Package.Auto(opts...)
+}
+
+// New creates a Lua task group with explicit module configuration.
 func New(modules map[string]Options) pocket.TaskGroup {
-	return &taskGroup{modules: modules}
-}
-
-type taskGroup struct {
-	modules map[string]Options
-}
-
-func (tg *taskGroup) Name() string { return name }
-
-func (tg *taskGroup) Modules() map[string]pocket.ModuleConfig {
-	modules := make(map[string]pocket.ModuleConfig, len(tg.modules))
-	for path, opts := range tg.modules {
-		modules[path] = opts
-	}
-	return modules
-}
-
-func (tg *taskGroup) ForContext(context string) pocket.TaskGroup {
-	if context == "." {
-		return tg
-	}
-	if opts, ok := tg.modules[context]; ok {
-		return &taskGroup{modules: map[string]Options{context: opts}}
-	}
-	return nil
-}
-
-func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
-	_ = cfg.WithDefaults()
-	var tasks []*pocket.Task
-
-	var formatTask *pocket.Task
-
-	if mods := tg.modulesFor("format"); len(mods) > 0 {
-		formatTask = FormatTask(mods)
-		tasks = append(tasks, formatTask)
-	}
-
-	// Create orchestrator task (simple for lua - just format).
-	allTask := &pocket.Task{
-		Name:   "lua-all",
-		Usage:  "run all Lua tasks",
-		Hidden: true,
-		Action: func(ctx context.Context, _ map[string]string) error {
-			return pocket.SerialDeps(ctx, formatTask)
-		},
-	}
-	tasks = append(tasks, allTask)
-
-	return tasks
-}
-
-// modulesFor returns modules with their task-specific options for a given task.
-func (tg *taskGroup) modulesFor(task string) map[string]Options {
-	result := make(map[string]Options)
-	for path, opts := range tg.modules {
-		if opts.ShouldRun(task) {
-			result[path] = opts
-		}
-	}
-	return result
+	return Package.New(modules)
 }
 
 // FormatTask returns a task that formats Lua files using stylua.
