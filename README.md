@@ -88,8 +88,8 @@ import (
 
 var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{
-        golang.Auto(),   // auto-detects go.mod files
-        python.Auto(),   // auto-detects pyproject.toml, setup.py, setup.cfg
+        golang.Auto(),   // auto-detects Go modules, runs linting/formatting/etc...
+        python.Auto(),   // auto-detects Python projects, runs linting/formatting/etc...
         markdown.Auto(), // formats markdown from root
     },
 }
