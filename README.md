@@ -5,8 +5,8 @@ An opinionated build/task system platform.
 > [!TIP]
 >
 > Pocket is written in Go, but you don't need Go installed to use Pocket. The
-> `./pok` shim (`pok.cmd` or `pk.ps1` on Windows) automatically downloads Go to
-> `.pocket/` if needed.
+> `./pok` shim (`pk.ps1` on Windows) automatically downloads Go to `.pocket/` if
+> needed.
 
 > [!WARNING]
 >
