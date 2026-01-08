@@ -18,7 +18,7 @@ func Task(cfg pocket.Config) *pocket.Task {
 		Name:    "update",
 		Usage:   "update pocket dependency and regenerate files",
 		Builtin: true,
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, _ *pocket.TaskOptions) error {
 			pocketDir := filepath.Join(pocket.FromGitRoot(), pocket.DirName)
 			verbose := pocket.IsVerbose(ctx)
 

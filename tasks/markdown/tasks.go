@@ -44,9 +44,11 @@ func FormatTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "md-format",
 		Usage: "format Markdown files",
-		Action: func(ctx context.Context, _ map[string]string) error {
-			if err := mdformat.Run(ctx, "."); err != nil {
-				return fmt.Errorf("mdformat failed: %w", err)
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+			for _, dir := range opts.Paths {
+				if err := mdformat.Run(ctx, pocket.FromGitRoot(dir)); err != nil {
+					return fmt.Errorf("mdformat failed in %s: %w", dir, err)
+				}
 			}
 			return nil
 		},

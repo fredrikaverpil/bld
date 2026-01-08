@@ -57,13 +57,13 @@ func FormatTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-format",
 		Usage: "format Python files",
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
 			configPath, err := ruff.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get ruff config: %w", err)
 			}
 
-			for _, dir := range detectModules() {
+			for _, dir := range opts.Paths {
 				if err := ruff.Run(ctx, "format", "--config", configPath, dir); err != nil {
 					return fmt.Errorf("ruff format failed in %s: %w", dir, err)
 				}
@@ -78,13 +78,13 @@ func LintTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-lint",
 		Usage: "lint Python files",
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
 			configPath, err := ruff.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get ruff config: %w", err)
 			}
 
-			for _, dir := range detectModules() {
+			for _, dir := range opts.Paths {
 				if err := ruff.Run(ctx, "check", "--config", configPath, dir); err != nil {
 					return fmt.Errorf("ruff check failed in %s: %w", dir, err)
 				}
@@ -99,8 +99,8 @@ func TypecheckTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-typecheck",
 		Usage: "type-check Python files",
-		Action: func(ctx context.Context, _ map[string]string) error {
-			for _, dir := range detectModules() {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+			for _, dir := range opts.Paths {
 				if err := mypy.Run(ctx, dir); err != nil {
 					return fmt.Errorf("mypy failed in %s: %w", dir, err)
 				}

@@ -29,8 +29,8 @@ var greetTask = &pocket.Task{
 	Args: []pocket.ArgDef{
 		{Name: "name", Usage: "who to greet", Default: "world"},
 	},
-	Action: func(_ context.Context, args map[string]string) error {
-		fmt.Printf("Hello, %s!\n", args["name"])
+	Action: func(_ context.Context, opts *pocket.TaskOptions) error {
+		fmt.Printf("Hello, %s!\n", opts.Args["name"])
 		return nil
 	},
 }

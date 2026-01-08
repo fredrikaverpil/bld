@@ -58,13 +58,13 @@ func FormatTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-format",
 		Usage: "format Go code (gofumpt, goimports, gci, golines)",
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
 			configPath, err := golangcilint.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get golangci-lint config: %w", err)
 			}
 
-			for _, dir := range detectModules() {
+			for _, dir := range opts.Paths {
 				cmd, err := golangcilint.Command(ctx, "fmt", "-c", configPath, "./...")
 				if err != nil {
 					return fmt.Errorf("prepare golangci-lint: %w", err)
@@ -84,13 +84,13 @@ func LintTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-lint",
 		Usage: "run golangci-lint",
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
 			configPath, err := golangcilint.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get golangci-lint config: %w", err)
 			}
 
-			for _, dir := range detectModules() {
+			for _, dir := range opts.Paths {
 				cmd, err := golangcilint.Command(ctx, "run", "--allow-parallel-runners", "-c", configPath, "./...")
 				if err != nil {
 					return fmt.Errorf("prepare golangci-lint: %w", err)
@@ -110,8 +110,8 @@ func TestTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-test",
 		Usage: "run Go tests",
-		Action: func(ctx context.Context, _ map[string]string) error {
-			for _, dir := range detectModules() {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+			for _, dir := range opts.Paths {
 				args := []string{"test"}
 				if pocket.IsVerbose(ctx) {
 					args = append(args, "-v")
@@ -134,8 +134,8 @@ func VulncheckTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-vulncheck",
 		Usage: "run govulncheck",
-		Action: func(ctx context.Context, _ map[string]string) error {
-			for _, dir := range detectModules() {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+			for _, dir := range opts.Paths {
 				cmd, err := govulncheck.Command(ctx, "./...")
 				if err != nil {
 					return fmt.Errorf("prepare govulncheck: %w", err)

@@ -131,9 +131,33 @@ func (p *PathFilter) RunsIn(dir string) bool {
 	return slices.Contains(resolved, dir)
 }
 
-// Run executes the inner Runnable.
-// Path filtering happens at CLI level, not during Run.
+// ResolveFor returns the resolved paths filtered for the given working directory.
+// If cwd is ".", returns all resolved paths.
+// Otherwise, returns only paths that match cwd.
+func (p *PathFilter) ResolveFor(cwd string) []string {
+	resolved := p.Resolve()
+	if cwd == "." {
+		return resolved
+	}
+	var result []string
+	for _, path := range resolved {
+		if path == cwd {
+			result = append(result, path)
+		}
+	}
+	return result
+}
+
+// Run executes the inner Runnable after setting resolved paths on tasks.
 func (p *PathFilter) Run(ctx context.Context) error {
+	cwd := CwdFromContext(ctx)
+	paths := p.ResolveFor(cwd)
+
+	// Set paths on all tasks in the inner Runnable.
+	for _, task := range p.inner.Tasks() {
+		task.SetPaths(paths)
+	}
+
 	return p.inner.Run(ctx)
 }
 

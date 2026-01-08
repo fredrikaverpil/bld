@@ -97,7 +97,7 @@ var Config = pocket.Config{
 var lintTask = &pocket.Task{
     Name:  "lint",
     Usage: "run linter",
-    Action: func(ctx context.Context, args map[string]string) error {
+    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
         cmd := pocket.Command(ctx, "golangci-lint", "run", "./...")
         return cmd.Run()
     },
@@ -106,7 +106,7 @@ var lintTask = &pocket.Task{
 var testTask = &pocket.Task{
     Name:  "test",
     Usage: "run tests",
-    Action: func(ctx context.Context, args map[string]string) error {
+    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
         cmd := pocket.Command(ctx, "go", "test", "./...")
         return cmd.Run()
     },
@@ -115,7 +115,7 @@ var testTask = &pocket.Task{
 var buildTask = &pocket.Task{
     Name:  "build",
     Usage: "build the project",
-    Action: func(ctx context.Context, args map[string]string) error {
+    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
         fmt.Println("Building...")
         cmd := pocket.Command(ctx, "go", "build", "./...")
         return cmd.Run()
@@ -136,8 +136,8 @@ var deployTask = &pocket.Task{
     Args: []pocket.ArgDef{
         {Name: "env", Usage: "target environment", Default: "staging"},
     },
-    Action: func(ctx context.Context, args map[string]string) error {
-        fmt.Printf("Deploying to %s...\n", args["env"])
+    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+        fmt.Printf("Deploying to %s...\n", opts.Args["env"])
         return nil
     },
 }
@@ -148,6 +148,90 @@ var deployTask = &pocket.Task{
 ./pok deploy env=prod     # Deploying to prod...
 ./pok -h deploy           # show task help with arguments
 ```
+
+### Tasks with Options
+
+For reusable tasks that need configuration, create functions that accept
+options:
+
+```go
+// Options for the lint task
+type LintOptions struct {
+    ConfigFile string
+    Fix        bool
+}
+
+// LintTask returns a configured lint task
+func LintTask(opts LintOptions) *pocket.Task {
+    return &pocket.Task{
+        Name:  "lint",
+        Usage: "run linter",
+        Action: func(ctx context.Context, _ *pocket.TaskOptions) error {
+            cmdArgs := []string{"run"}
+            if opts.ConfigFile != "" {
+                cmdArgs = append(cmdArgs, "-c", opts.ConfigFile)
+            }
+            if opts.Fix {
+                cmdArgs = append(cmdArgs, "--fix")
+            }
+            cmdArgs = append(cmdArgs, "./...")
+            return pocket.Command(ctx, "golangci-lint", cmdArgs...).Run()
+        },
+    }
+}
+
+// Usage in config.go
+var Config = pocket.Config{
+    Run: pocket.Serial(
+        LintTask(LintOptions{
+            ConfigFile: pocket.FromGitRoot(".golangci.yml"),
+            Fix:        true,
+        }),
+    ),
+}
+```
+
+### Grouping Tasks with Options
+
+For related tasks that share configuration, create a struct that implements
+`Runnable` and accepts options:
+
+```go
+type MyOptions struct {
+    ConfigFile string
+    Verbose    bool
+}
+
+func MyTasks(opts MyOptions) pocket.Runnable {
+    return &myTasks{
+        opts:   opts,
+        format: formatTask(opts),
+        lint:   lintTask(opts),
+    }
+}
+
+type myTasks struct {
+    opts   MyOptions
+    format *pocket.Task
+    lint   *pocket.Task
+}
+
+func (m *myTasks) Run(ctx context.Context) error {
+    return pocket.SerialDeps(ctx, m.format, m.lint)
+}
+
+func (m *myTasks) Tasks() []*pocket.Task {
+    return []*pocket.Task{m.format, m.lint}
+}
+
+// Usage
+var Config = pocket.Config{
+    Run: MyTasks(MyOptions{ConfigFile: ".myconfig.yml", Verbose: true}),
+}
+```
+
+Options flow from the group to individual tasks - each task function (like
+`formatTask(opts)`) receives the options and uses them in its Action closure.
 
 ### Path Filtering (Multi-Directory Projects)
 

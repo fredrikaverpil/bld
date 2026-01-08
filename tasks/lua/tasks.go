@@ -44,13 +44,15 @@ func FormatTask() *pocket.Task {
 	return &pocket.Task{
 		Name:  "lua-format",
 		Usage: "format Lua files",
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
 			configPath, err := stylua.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get stylua config: %w", err)
 			}
-			if err := stylua.Run(ctx, "-f", configPath, "."); err != nil {
-				return fmt.Errorf("stylua format failed: %w", err)
+			for _, dir := range opts.Paths {
+				if err := stylua.Run(ctx, "-f", configPath, pocket.FromGitRoot(dir)); err != nil {
+					return fmt.Errorf("stylua format failed in %s: %w", dir, err)
+				}
 			}
 			return nil
 		},

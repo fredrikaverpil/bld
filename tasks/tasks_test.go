@@ -161,14 +161,14 @@ func TestDeps_ParallelExecution(t *testing.T) {
 	var count atomic.Int32
 	task1 := &pocket.Task{
 		Name: "task1",
-		Action: func(_ context.Context, _ map[string]string) error {
+		Action: func(_ context.Context, _ *pocket.TaskOptions) error {
 			count.Add(1)
 			return nil
 		},
 	}
 	task2 := &pocket.Task{
 		Name: "task2",
-		Action: func(_ context.Context, _ map[string]string) error {
+		Action: func(_ context.Context, _ *pocket.TaskOptions) error {
 			count.Add(1)
 			return nil
 		},
@@ -188,14 +188,14 @@ func TestSerialDeps_SequentialExecution(t *testing.T) {
 	var order []string
 	task1 := &pocket.Task{
 		Name: "task1",
-		Action: func(_ context.Context, _ map[string]string) error {
+		Action: func(_ context.Context, _ *pocket.TaskOptions) error {
 			order = append(order, "task1")
 			return nil
 		},
 	}
 	task2 := &pocket.Task{
 		Name: "task2",
-		Action: func(_ context.Context, _ map[string]string) error {
+		Action: func(_ context.Context, _ *pocket.TaskOptions) error {
 			order = append(order, "task2")
 			return nil
 		},
@@ -215,7 +215,7 @@ func TestTask_RunsOnlyOnce(t *testing.T) {
 	runCount := 0
 	task := &pocket.Task{
 		Name: "once",
-		Action: func(_ context.Context, _ map[string]string) error {
+		Action: func(_ context.Context, _ *pocket.TaskOptions) error {
 			runCount++
 			return nil
 		},

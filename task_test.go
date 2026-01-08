@@ -92,8 +92,8 @@ func TestTask_ActionReceivesArgs(t *testing.T) {
 		Args: []ArgDef{
 			{Name: "name", Default: "world"},
 		},
-		Action: func(_ context.Context, args map[string]string) error {
-			receivedArgs = args
+		Action: func(_ context.Context, opts *TaskOptions) error {
+			receivedArgs = opts.Args
 			return nil
 		},
 	}
@@ -117,8 +117,8 @@ func TestTask_RunInitializesArgs(t *testing.T) {
 		Args: []ArgDef{
 			{Name: "name", Default: "default-value"},
 		},
-		Action: func(_ context.Context, args map[string]string) error {
-			receivedArgs = args
+		Action: func(_ context.Context, opts *TaskOptions) error {
+			receivedArgs = opts.Args
 			return nil
 		},
 	}

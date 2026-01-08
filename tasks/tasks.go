@@ -61,7 +61,7 @@ func New(cfg pocket.Config) *Tasks {
 		Name:   "all",
 		Usage:  "run all tasks",
 		Hidden: true,
-		Action: func(ctx context.Context, _ map[string]string) error {
+		Action: func(ctx context.Context, _ *pocket.TaskOptions) error {
 			// Generate first.
 			if err := t.Generate.Run(ctx); err != nil {
 				return err
