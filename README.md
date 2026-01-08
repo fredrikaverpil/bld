@@ -101,7 +101,7 @@ var Config = pocket.Config{
 var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{
         golang.Auto(golang.Options{
-            Lint: golang.LintOptions{ConfigFile: ".golangci.yml"},
+            Lint: golang.LintOptions{ConfigFile: pocket.FromGitRoot(".golangci.yml")},
         }),
     },
 }
@@ -146,7 +146,7 @@ var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{
         golang.New(map[string]golang.Options{
             "proj1": {
-                Lint: golang.LintOptions{ConfigFile: "proj1/.golangci.yml"},
+                Lint: golang.LintOptions{ConfigFile: pocket.FromGitRoot("proj1", ".golangci.yml")},
             },
             "proj2": {
                 Skip: []string{"go-test"}, // skip tests for this module
