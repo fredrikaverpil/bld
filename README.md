@@ -393,20 +393,6 @@ if pocket.IsVerbose(ctx) {
 }
 ```
 
-**Skip options (for Auto mode):**
-
-```go
-var Config = pocket.Config{
-    TaskGroups: []pocket.TaskGroup{
-        golang.Auto(golang.Options{},
-            pocket.SkipPath(`\.pocket`),           // skip all tasks for matching paths
-            pocket.SkipTask("go-vulncheck", `.*`), // skip specific task for matching paths
-            pocket.ShowAll(),                      // make go-all visible in help
-        ),
-    },
-}
-```
-
 ## Acknowledgements
 
 - [einride/sage](https://github.com/einride/sage) - Inspiration for the task
