@@ -46,7 +46,7 @@ This creates:
 ./pok -h         # list all tasks
 ./pok            # run all tasks
 ./pok update     # update pocket to latest version
-./pok generate   # regenerate "pok" shim
+./pok generate   # regenerate "pok" shim(s)
 ```
 
 > [!NOTE]
