@@ -5,22 +5,11 @@
 package main
 
 import (
-	"os"
-
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tasks"
 )
 
 func main() {
-	// Get the context from the shim (defaults to root).
-	context := os.Getenv("POK_CONTEXT")
-	if context == "" {
-		context = "."
-	}
-
-	// Create tasks based on config.
-	// Filtering for context is handled internally by tasks.New.
-	t := tasks.New(Config, context)
-
+	t := tasks.New(Config)
 	pocket.Main(t.AllTasks(), t.All)
 }

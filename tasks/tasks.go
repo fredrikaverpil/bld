@@ -25,7 +25,7 @@ type Tasks struct {
 	// GitDiff fails if there are uncommitted changes.
 	GitDiff *pocket.Task
 
-	// Tasks holds standalone tasks registered for this context.
+	// Tasks holds standalone tasks registered in config.
 	Tasks []*pocket.Task
 
 	// TaskGroupTasks holds all tasks from registered task groups.
@@ -33,30 +33,25 @@ type Tasks struct {
 }
 
 // New creates tasks based on the provided Config.
-// It filters both config and task groups for the current context.
-func New(cfg pocket.Config, ctxPath string) *Tasks {
+func New(cfg pocket.Config) *Tasks {
 	cfg = cfg.WithDefaults()
 	t := &Tasks{}
 
 	// Generate runs first - other tasks may need generated files.
 	t.Generate = generate.Task(cfg)
 
-	// Update is standalone (not part of "all")
+	// Update is standalone (not part of "all").
 	t.Update = update.Task(cfg)
 
 	// GitDiff is available as a standalone task.
 	t.GitDiff = gitdiff.Task()
 
-	// Filter config for context (this also filters task groups).
-	filteredCfg := cfg.ForContext(ctxPath)
-
 	// Collect orchestrator tasks from task groups (hidden tasks that control order).
 	var orchestratorTasks []*pocket.Task
 
-	// Create tasks from context-filtered task groups.
-	for _, tg := range filteredCfg.TaskGroups {
-		tgTasks := tg.Tasks(filteredCfg)
-		for _, task := range tgTasks {
+	// Create tasks from task groups.
+	for _, tg := range cfg.TaskGroups {
+		for _, task := range tg.Tasks() {
 			t.TaskGroupTasks = append(t.TaskGroupTasks, task)
 			if task.Hidden {
 				// Hidden tasks are orchestrators that control execution order.
@@ -65,8 +60,8 @@ func New(cfg pocket.Config, ctxPath string) *Tasks {
 		}
 	}
 
-	// Define standalone tasks from filtered config.
-	t.Tasks = append(t.Tasks, filteredCfg.GetTasks()...)
+	// Add standalone tasks from config.
+	t.Tasks = cfg.Tasks
 
 	// Create the "all" task that runs everything, then checks for uncommitted changes.
 	t.All = &pocket.Task{

@@ -88,18 +88,16 @@ func GenerateWithRoot(cfg pocket.Config, rootDir string) error {
 		})
 	}
 
-	// Generate each shim type for all contexts.
+	// Generate each shim type at root.
 	for _, st := range types {
 		tmpl, err := template.New(st.name).Parse(st.template)
 		if err != nil {
 			return fmt.Errorf("parsing %s template: %w", st.name, err)
 		}
 
-		for _, context := range pocket.AllModulePaths(cfg) {
-			err := generateShim(tmpl, cfg.Shim.Name, st.extension, st.pathSep, goVersion, checksums, context, rootDir)
-			if err != nil {
-				return fmt.Errorf("generating %s shim for context %q: %w", st.name, context, err)
-			}
+		err = generateShim(tmpl, cfg.Shim.Name, st.extension, st.pathSep, goVersion, checksums, rootDir)
+		if err != nil {
+			return fmt.Errorf("generating %s shim: %w", st.name, err)
 		}
 	}
 
@@ -129,20 +127,17 @@ func extractGoVersionFromDir(dir string) (string, error) {
 	return "", fmt.Errorf("no go directive in %s", gomodPath)
 }
 
-// generateShim creates a single shim for the given context.
+// generateShim creates a single shim at root.
 func generateShim(
 	tmpl *template.Template,
-	shimName, extension, pathSep, goVersion string,
+	shimName, extension, _, goVersion string,
 	checksums GoChecksums,
-	context, rootDir string,
+	rootDir string,
 ) error {
-	// Calculate the relative path from the shim location to .pocket/.
-	pocketDir := calculatePocketDir(context, pathSep)
-
 	data := shimData{
 		GoVersion:   goVersion,
-		PocketDir:   pocketDir,
-		Context:     context,
+		PocketDir:   ".pocket",
+		Context:     ".",
 		GoChecksums: checksums,
 	}
 
@@ -151,47 +146,10 @@ func generateShim(
 		return fmt.Errorf("executing shim template: %w", err)
 	}
 
-	// Build the shim filename.
-	shimFilename := shimName + extension
-
-	// Determine the shim path.
-	var shimPath string
-	if context == "." {
-		shimPath = filepath.Join(rootDir, shimFilename)
-	} else {
-		// Ensure the directory exists.
-		dir := filepath.Join(rootDir, context)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return fmt.Errorf("creating directory %s: %w", context, err)
-		}
-		shimPath = filepath.Join(dir, shimFilename)
-	}
-
+	shimPath := filepath.Join(rootDir, shimName+extension)
 	if err := os.WriteFile(shimPath, buf.Bytes(), 0o755); err != nil {
 		return fmt.Errorf("writing shim: %w", err)
 	}
 
 	return nil
-}
-
-// calculatePocketDir returns the relative path from a context directory to .pocket/.
-// For "." it returns ".pocket", for "tests" it returns "../.pocket", etc.
-// Uses the provided path separator for the output.
-func calculatePocketDir(context, pathSep string) string {
-	if context == "." {
-		return ".pocket"
-	}
-
-	// Count the depth of the context path.
-	// Handle both forward and back slashes for cross-platform compatibility.
-	depth := strings.Count(context, "/") + strings.Count(context, "\\") + 1
-
-	// Build the relative path back to root, then to .pocket.
-	parts := make([]string, depth+1)
-	for i := range depth {
-		parts[i] = ".."
-	}
-	parts[depth] = ".pocket"
-
-	return strings.Join(parts, pathSep)
 }

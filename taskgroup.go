@@ -1,107 +1,34 @@
 package pocket
 
-// TaskGroup defines a collection of related tasks for a technology (e.g., Go, Lua, Markdown).
-// Implement this interface to create custom task groups.
-type TaskGroup interface {
-	// Name returns the task group identifier (e.g., "go", "lua", "markdown").
-	Name() string
+import "context"
 
-	// DetectModules returns paths where this task group could apply.
-	// Used by Auto() to discover modules. Implementers define the detection logic,
-	// typically using helpers like DetectByFile() or DetectByExtension().
-	DetectModules() []string
-
-	// ModuleConfigs returns the module configuration for this task group.
-	// The map keys are context paths (e.g., ".", "tests", "services/api").
-	ModuleConfigs() map[string]ModuleConfig
-
-	// Tasks returns the tasks provided by this task group.
-	// The returned slice should include individual tasks plus an orchestrator
-	// task (marked Hidden) that controls execution order.
-	Tasks(cfg Config) []*Task
-
-	// ForContext returns a filtered task group containing only modules for the given path.
-	// For the root context ("."), returns the task group unchanged.
-	// Returns nil if the task group has no modules for the given context.
-	ForContext(context string) TaskGroup
+// TaskGroup is a named collection of related tasks.
+type TaskGroup struct {
+	name  string
+	tasks []*Task
 }
 
-// ModuleConfig defines configuration for a module within a task group.
-// Task groups can implement this interface with their own types to support
-// task-group-specific options while maintaining compatibility with pocket's
-// filtering and orchestration.
-type ModuleConfig interface {
-	// ShouldRun returns true if the given task should run based on the configuration.
-	// The task parameter is the task name without prefix (e.g., "format", "lint", "test").
-	ShouldRun(task string) bool
-}
+// Name returns the task group name (e.g., "go", "lua", "markdown").
+func (g *TaskGroup) Name() string { return g.name }
 
-// ModulesFor returns module paths where the given task should run for a task group.
-func ModulesFor(tg TaskGroup, task string) []string {
-	modules := tg.ModuleConfigs()
-	if modules == nil {
-		return nil
-	}
-	var paths []string
-	for path, opts := range modules {
-		if opts.ShouldRun(task) {
-			paths = append(paths, path)
-		}
-	}
-	return paths
-}
+// Tasks returns all tasks in this group, including the orchestrator task.
+func (g *TaskGroup) Tasks() []*Task { return g.tasks }
 
-// AllTaskGroupModulePaths returns all unique module paths across all task groups.
-func AllTaskGroupModulePaths(taskGroups []TaskGroup) []string {
-	seen := make(map[string]bool)
-	for _, tg := range taskGroups {
-		for path := range tg.ModuleConfigs() {
-			seen[path] = true
-		}
-	}
-	paths := make([]string, 0, len(seen))
-	for path := range seen {
-		paths = append(paths, path)
-	}
-	return paths
-}
-
-// AllModulePaths returns all unique module paths across task groups and config tasks.
-// The paths always include "." for the root context.
-func AllModulePaths(cfg Config) []string {
-	seen := make(map[string]bool)
-	seen["."] = true // Always include root.
-
-	// Add task group module paths.
-	for _, tg := range cfg.TaskGroups {
-		for path := range tg.ModuleConfigs() {
-			seen[path] = true
-		}
+// NewTaskGroup creates a task group with the given name and tasks.
+// An orchestrator task (name-all) is automatically added that runs all tasks serially.
+func NewTaskGroup(name string, tasks ...*Task) *TaskGroup {
+	// Create orchestrator task that runs all tasks serially.
+	allTask := &Task{
+		Name:   name + "-all",
+		Usage:  "run all " + name + " tasks",
+		Hidden: true,
+		Action: func(ctx context.Context, _ map[string]string) error {
+			return SerialDeps(ctx, tasks...)
+		},
 	}
 
-	// Add task paths.
-	for path := range cfg.Tasks {
-		seen[path] = true
+	return &TaskGroup{
+		name:  name,
+		tasks: append(tasks, allTask),
 	}
-
-	paths := make([]string, 0, len(seen))
-	for path := range seen {
-		paths = append(paths, path)
-	}
-	return paths
-}
-
-// FilterTaskGroupsForContext returns task groups filtered for the given context.
-// Task groups with no modules for the context are excluded.
-func FilterTaskGroupsForContext(taskGroups []TaskGroup, context string) []TaskGroup {
-	if context == "." {
-		return taskGroups
-	}
-	var filtered []TaskGroup
-	for _, tg := range taskGroups {
-		if ftg := tg.ForContext(context); ftg != nil {
-			filtered = append(filtered, ftg)
-		}
-	}
-	return filtered
 }

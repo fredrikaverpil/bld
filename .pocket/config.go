@@ -10,12 +10,12 @@ import (
 )
 
 var Config = pocket.Config{
-	TaskGroups: []pocket.TaskGroup{
-		golang.Auto(golang.Options{}),
-		markdown.Auto(markdown.Options{}),
+	TaskGroups: []*pocket.TaskGroup{
+		golang.NewTaskGroup(),
+		markdown.NewTaskGroup(),
 	},
-	Tasks: map[string][]*pocket.Task{
-		".": {greetTask},
+	Tasks: []*pocket.Task{
+		greetTask,
 	},
 	Shim: &pocket.ShimConfig{
 		Posix:      true,
