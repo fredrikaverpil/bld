@@ -10,10 +10,9 @@ An opinionated build/task system platform.
 
 > [!TIP]
 >
-> If you don't agree with Pocket's opinonated tasks, fork it!
->
+> If you don't agree with Pocket's opinonated tasks, fork it!  
 > You can still leverage both tools and tasks from Pocket, but from your own
-> fork.
+> fork; your own platform.
 
 > [!WARNING]
 >
