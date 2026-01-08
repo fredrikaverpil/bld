@@ -23,7 +23,8 @@ An opinionated build system platform for Go projects, powered by
 
 ## Bootstrap a new project
 
-Run the init command in your project root:
+This is the only part of Pocket which requires you to have Go installed. Run the
+init command in your project root:
 
 ```bash
 go run github.com/fredrikaverpil/pocket/cmd/pocket@latest init
