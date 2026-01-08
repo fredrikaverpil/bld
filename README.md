@@ -2,11 +2,18 @@
 
 An opinionated build/task system platform.
 
-> [!TIP]
+> [!NOTE]
 >
-> Pocket is written in Go, but you don't need Go installed to use Pocket. The
+> Pocket is written in Go, but you don't need Go installed to use it. The
 > `./pok` shim (`pk.ps1` on Windows) automatically downloads Go to `.pocket/` if
 > needed.
+
+> [!TIP]
+>
+> If you don't agree with Pocket's opinonated tasks, fork it!
+>
+> You can still leverage both tools and tasks from Pocket, but from your own
+> fork.
 
 > [!WARNING]
 >
