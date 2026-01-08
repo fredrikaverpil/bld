@@ -244,7 +244,8 @@ rem PowerShell
 
 ### Task Groups
 
-- Group related tasks for a language or purpose (e.g., `golang`, `lua`, `markdown`)
+- Group related tasks for a language or purpose (e.g., `golang`, `lua`,
+  `markdown`)
 - Each task group owns its own `Config` and `Options` types
 - Implement the `pocket.TaskGroup` interface
 - Configured in `pocket.Config.TaskGroups`
