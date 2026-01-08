@@ -16,7 +16,8 @@ An opinionated build system platform for Go projects, powered by
 ## Features
 
 - **Cross-platform**: No Makefiles - works on Windows, macOS, and Linux
-- **Task management**: Defines tasks like `go-test`, `go-lint`...
+- **Task management**: Defines tasks like `go-test`, `python-lint`,
+  `md-format`...
 - **Tool management**: Downloads and caches tools in `.pocket/`
 - **Simple invocation**: Just `./pok <task>` or `./pok -h` to list all tasks
 
