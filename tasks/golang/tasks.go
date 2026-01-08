@@ -81,7 +81,7 @@ func FormatTask(opts Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-format",
 		Usage: "format Go code (gofumpt, goimports, gci, golines)",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			configPath := opts.LintConfig
 			if configPath == "" {
 				var err error
@@ -111,7 +111,7 @@ func LintTask(opts Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-lint",
 		Usage: "run golangci-lint",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			configPath := opts.LintConfig
 			if configPath == "" {
 				var err error
@@ -141,7 +141,7 @@ func TestTask(opts Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-test",
 		Usage: "run Go tests",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			for _, dir := range taskOpts.Paths {
 				args := []string{"test"}
 				if pocket.IsVerbose(ctx) {
@@ -168,7 +168,7 @@ func VulncheckTask(_ Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "go-vulncheck",
 		Usage: "run govulncheck",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			for _, dir := range taskOpts.Paths {
 				cmd, err := govulncheck.Command(ctx, "./...")
 				if err != nil {

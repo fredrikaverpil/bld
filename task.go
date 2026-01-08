@@ -16,8 +16,8 @@ type ArgDef struct {
 	Default string // default value if not provided
 }
 
-// TaskOptions provides task-specific options to Actions.
-type TaskOptions struct {
+// RunContext provides runtime context to Actions.
+type RunContext struct {
 	Args  map[string]string // CLI arguments (key=value pairs)
 	Paths []string          // resolved paths for this task (from Paths wrapper)
 	Cwd   string            // current working directory (relative to git root)
@@ -28,7 +28,7 @@ type Task struct {
 	Name    string
 	Usage   string
 	Args    []ArgDef // declared arguments this task accepts
-	Action  func(ctx context.Context, opts *TaskOptions) error
+	Action  func(ctx context.Context, rc *RunContext) error
 	Hidden  bool
 	Builtin bool // true for core tasks like generate, update, git-diff
 
@@ -110,17 +110,17 @@ func (t *Task) Run(ctx context.Context) error {
 		if t.args == nil {
 			t.SetArgs(nil)
 		}
-		// Build TaskOptions with resolved paths and cwd.
-		opts := &TaskOptions{
+		// Build RunContext with resolved paths and cwd.
+		rc := &RunContext{
 			Args:  t.args,
 			Paths: t.paths,
 			Cwd:   CwdFromContext(ctx),
 		}
 		// Default to cwd if no paths were set.
-		if len(opts.Paths) == 0 {
-			opts.Paths = []string{opts.Cwd}
+		if len(rc.Paths) == 0 {
+			rc.Paths = []string{rc.Cwd}
 		}
-		t.err = t.Action(ctx, opts)
+		t.err = t.Action(ctx, rc)
 	})
 	return t.err
 }

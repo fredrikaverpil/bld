@@ -68,7 +68,7 @@ func FormatTask(opts Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-format",
 		Usage: "format Python files",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			configPath := opts.RuffConfig
 			if configPath == "" {
 				var err error
@@ -93,7 +93,7 @@ func LintTask(opts Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-lint",
 		Usage: "lint Python files",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			configPath := opts.RuffConfig
 			if configPath == "" {
 				var err error
@@ -118,7 +118,7 @@ func TypecheckTask(_ Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "py-typecheck",
 		Usage: "type-check Python files",
-		Action: func(ctx context.Context, taskOpts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, taskOpts *pocket.RunContext) error {
 			for _, dir := range taskOpts.Paths {
 				if err := mypy.Run(ctx, dir); err != nil {
 					return fmt.Errorf("mypy failed in %s: %w", dir, err)

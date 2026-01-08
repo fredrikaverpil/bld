@@ -51,7 +51,7 @@ func FormatTask(_ Options) *pocket.Task {
 	return &pocket.Task{
 		Name:  "lua-format",
 		Usage: "format Lua files",
-		Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+		Action: func(ctx context.Context, opts *pocket.RunContext) error {
 			configPath, err := stylua.ConfigPath()
 			if err != nil {
 				return fmt.Errorf("get stylua config: %w", err)

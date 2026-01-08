@@ -97,7 +97,7 @@ var Config = pocket.Config{
 var lintTask = &pocket.Task{
     Name:  "lint",
     Usage: "run linter",
-    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+    Action: func(ctx context.Context, opts *pocket.RunContext) error {
         cmd := pocket.Command(ctx, "golangci-lint", "run", "./...")
         return cmd.Run()
     },
@@ -106,7 +106,7 @@ var lintTask = &pocket.Task{
 var testTask = &pocket.Task{
     Name:  "test",
     Usage: "run tests",
-    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+    Action: func(ctx context.Context, opts *pocket.RunContext) error {
         cmd := pocket.Command(ctx, "go", "test", "./...")
         return cmd.Run()
     },
@@ -115,7 +115,7 @@ var testTask = &pocket.Task{
 var buildTask = &pocket.Task{
     Name:  "build",
     Usage: "build the project",
-    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+    Action: func(ctx context.Context, opts *pocket.RunContext) error {
         fmt.Println("Building...")
         cmd := pocket.Command(ctx, "go", "build", "./...")
         return cmd.Run()
@@ -136,7 +136,7 @@ var deployTask = &pocket.Task{
     Args: []pocket.ArgDef{
         {Name: "env", Usage: "target environment", Default: "staging"},
     },
-    Action: func(ctx context.Context, opts *pocket.TaskOptions) error {
+    Action: func(ctx context.Context, opts *pocket.RunContext) error {
         fmt.Printf("Deploying to %s...\n", opts.Args["env"])
         return nil
     },
@@ -166,7 +166,7 @@ func LintTask(opts LintOptions) *pocket.Task {
     return &pocket.Task{
         Name:  "lint",
         Usage: "run linter",
-        Action: func(ctx context.Context, _ *pocket.TaskOptions) error {
+        Action: func(ctx context.Context, _ *pocket.RunContext) error {
             cmdArgs := []string{"run"}
             if opts.ConfigFile != "" {
                 cmdArgs = append(cmdArgs, "-c", opts.ConfigFile)
