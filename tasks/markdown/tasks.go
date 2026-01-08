@@ -2,11 +2,12 @@
 package markdown
 
 import (
+	"context"
+	"fmt"
 	"slices"
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tools/mdformat"
-	"github.com/goyek/goyek/v3"
 )
 
 const name = "markdown"
@@ -65,13 +66,27 @@ func (tg *taskGroup) ForContext(context string) pocket.TaskGroup {
 	return nil
 }
 
-func (tg *taskGroup) Tasks(cfg pocket.Config) []*goyek.DefinedTask {
+func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 	_ = cfg.WithDefaults()
-	var tasks []*goyek.DefinedTask
+	var tasks []*pocket.Task
+
+	var formatTask *pocket.Task
 
 	if mods := tg.modulesFor("format"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(FormatTask(mods)))
+		formatTask = FormatTask(mods)
+		tasks = append(tasks, formatTask)
 	}
+
+	// Create orchestrator task (simple for markdown - just format).
+	allTask := &pocket.Task{
+		Name:   "md-all",
+		Usage:  "run all Markdown tasks",
+		Hidden: true,
+		Action: func(ctx context.Context, _ map[string]string) error {
+			return pocket.SerialDeps(ctx, formatTask)
+		},
+	}
+	tasks = append(tasks, allTask)
 
 	return tasks
 }
@@ -89,16 +104,17 @@ func (tg *taskGroup) modulesFor(task string) map[string]Options {
 
 // FormatTask returns a task that formats Markdown files using mdformat.
 // The modules map specifies which directories to format and their options.
-func FormatTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func FormatTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "md-format",
 		Usage: "format Markdown files",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod := range modules {
-				if err := mdformat.Run(a.Context(), mod); err != nil {
-					a.Errorf("mdformat format failed in %s: %v", mod, err)
+				if err := mdformat.Run(ctx, mod); err != nil {
+					return fmt.Errorf("mdformat format failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }

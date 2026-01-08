@@ -2,12 +2,13 @@
 package golang
 
 import (
+	"context"
+	"fmt"
 	"slices"
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tools/golangcilint"
 	"github.com/fredrikaverpil/pocket/tools/govulncheck"
-	"github.com/goyek/goyek/v3"
 )
 
 const name = "go"
@@ -89,22 +90,44 @@ func (tg *taskGroup) ForContext(context string) pocket.TaskGroup {
 	return nil
 }
 
-func (tg *taskGroup) Tasks(cfg pocket.Config) []*goyek.DefinedTask {
+func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 	_ = cfg.WithDefaults()
-	var tasks []*goyek.DefinedTask
+	var tasks []*pocket.Task
+
+	var formatTask, lintTask, testTask, vulncheckTask *pocket.Task
 
 	if mods := tg.modulesFor("format"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(FormatTask(mods)))
-	}
-	if mods := tg.modulesFor("test"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(TestTask(mods)))
+		formatTask = FormatTask(mods)
+		tasks = append(tasks, formatTask)
 	}
 	if mods := tg.modulesFor("lint"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(LintTask(mods)))
+		lintTask = LintTask(mods)
+		tasks = append(tasks, lintTask)
+	}
+	if mods := tg.modulesFor("test"); len(mods) > 0 {
+		testTask = TestTask(mods)
+		tasks = append(tasks, testTask)
 	}
 	if mods := tg.modulesFor("vulncheck"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(VulncheckTask(mods)))
+		vulncheckTask = VulncheckTask(mods)
+		tasks = append(tasks, vulncheckTask)
 	}
+
+	// Create orchestrator task that controls execution order.
+	allTask := &pocket.Task{
+		Name:   "go-all",
+		Usage:  "run all Go tasks",
+		Hidden: true,
+		Action: func(ctx context.Context, _ map[string]string) error {
+			// Format and lint run serially (they modify files).
+			if err := pocket.SerialDeps(ctx, formatTask, lintTask); err != nil {
+				return err
+			}
+			// Test and vulncheck run in parallel (read-only).
+			return pocket.Deps(ctx, testTask, vulncheckTask)
+		},
+	}
+	tasks = append(tasks, allTask)
 
 	return tasks
 }
@@ -122,42 +145,46 @@ func (tg *taskGroup) modulesFor(task string) map[string]Options {
 
 // FormatTask returns a task that formats Go code using golangci-lint fmt.
 // The modules map specifies which directories to format and their options.
-func FormatTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func FormatTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "go-format",
 		Usage: "format Go code (gofumpt, goimports, gci, golines)",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Format.ConfigFile
 				if configPath == "" {
 					var err error
 					configPath, err = golangcilint.ConfigPath()
 					if err != nil {
-						a.Fatalf("get golangci-lint config: %v", err)
+						return fmt.Errorf("get golangci-lint config: %w", err)
 					}
 				}
-				cmd, err := golangcilint.Command(a.Context(), "fmt", "-c", configPath, "./...")
+				cmd, err := golangcilint.Command(ctx, "fmt", "-c", configPath, "./...")
 				if err != nil {
-					a.Fatalf("prepare golangci-lint: %v", err)
+					return fmt.Errorf("prepare golangci-lint: %w", err)
 				}
 				cmd.Dir = pocket.FromGitRoot(mod)
 				if err := cmd.Run(); err != nil {
-					a.Errorf("golangci-lint fmt failed in %s: %v", mod, err)
+					return fmt.Errorf("golangci-lint fmt failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }
 
 // TestTask returns a task that runs Go tests with race detection.
 // The modules map specifies which directories to test and their options.
-func TestTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func TestTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "go-test",
 		Usage: "run Go tests",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
-				args := []string{"test", "-v"}
+				args := []string{"test"}
+				if pocket.IsVerbose(ctx) {
+					args = append(args, "-v")
+				}
 				if !opts.Test.NoRace {
 					args = append(args, "-race")
 				}
@@ -165,34 +192,35 @@ func TestTask(modules map[string]Options) goyek.Task {
 					args = append(args, "-short")
 				}
 				args = append(args, "./...")
-				cmd := pocket.Command(a.Context(), "go", args...)
+				cmd := pocket.Command(ctx, "go", args...)
 				cmd.Dir = pocket.FromGitRoot(mod)
 				if err := cmd.Run(); err != nil {
-					a.Errorf("go test failed in %s: %v", mod, err)
+					return fmt.Errorf("go test failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }
 
 // LintTask returns a task that runs golangci-lint.
 // The modules map specifies which directories to lint and their options.
-func LintTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func LintTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "go-lint",
 		Usage: "run golangci-lint",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Lint.ConfigFile
 				if configPath == "" {
 					var err error
 					configPath, err = golangcilint.ConfigPath()
 					if err != nil {
-						a.Fatalf("get golangci-lint config: %v", err)
+						return fmt.Errorf("get golangci-lint config: %w", err)
 					}
 				}
 				cmd, err := golangcilint.Command(
-					a.Context(),
+					ctx,
 					"run",
 					"--allow-parallel-runners",
 					"-c",
@@ -200,34 +228,36 @@ func LintTask(modules map[string]Options) goyek.Task {
 					"./...",
 				)
 				if err != nil {
-					a.Fatalf("prepare golangci-lint: %v", err)
+					return fmt.Errorf("prepare golangci-lint: %w", err)
 				}
 				cmd.Dir = pocket.FromGitRoot(mod)
 				if err := cmd.Run(); err != nil {
-					a.Errorf("golangci-lint failed in %s: %v", mod, err)
+					return fmt.Errorf("golangci-lint failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }
 
 // VulncheckTask returns a task that runs govulncheck.
 // The modules map specifies which directories to check and their options.
-func VulncheckTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func VulncheckTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "go-vulncheck",
 		Usage: "run govulncheck",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod := range modules {
-				cmd, err := govulncheck.Command(a.Context(), "./...")
+				cmd, err := govulncheck.Command(ctx, "./...")
 				if err != nil {
-					a.Fatalf("prepare govulncheck: %v", err)
+					return fmt.Errorf("prepare govulncheck: %w", err)
 				}
 				cmd.Dir = pocket.FromGitRoot(mod)
 				if err := cmd.Run(); err != nil {
-					a.Errorf("govulncheck failed in %s: %v", mod, err)
+					return fmt.Errorf("govulncheck failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }

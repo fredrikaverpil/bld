@@ -10,7 +10,7 @@ An opinionated build/task system platform.
 
 > [!TIP]
 >
-> If you don't agree with Pocket's opinonated tasks, fork it!  
+> If you don't agree with Pocket's opinonated tasks, fork it!\
 > You can still leverage both tools and tasks from Pocket, but from your own
 > fork; your own platform.
 
@@ -137,26 +137,29 @@ golang.New(map[string]golang.Options{
 
 ### Custom Tasks
 
-Add your own tasks in `.pocket/mytask.go`:
+Add your own tasks in `.pocket/config.go`:
 
 ```go
 import (
+    "context"
+    "fmt"
+
     "github.com/fredrikaverpil/pocket"
-    "github.com/goyek/goyek/v3"
 )
 
 var Config = pocket.Config{
     TaskGroups: []pocket.TaskGroup{...},
 
     // Custom tasks per module path
-    Tasks: map[string][]goyek.Task{
+    Tasks: map[string][]*pocket.Task{
         ".": {  // available from root ./pok
             {
                 Name:  "deploy",
                 Usage: "deploy to production",
-                Action: func(a *goyek.A) {
-                    a.Log("Deploying...")
+                Action: func(ctx context.Context, args map[string]string) error {
+                    fmt.Println("Deploying...")
                     // your logic here
+                    return nil
                 },
             },
         },
@@ -166,17 +169,39 @@ var Config = pocket.Config{
 
 Custom tasks appear in `./pok -h` and run as part of `./pok all`.
 
+**Tasks with arguments:**
+
+Tasks can declare arguments that users pass via `key=value` syntax:
+
+```go
+var greetTask = &pocket.Task{
+    Name:  "greet",
+    Usage: "print a greeting",
+    Args: []pocket.ArgDef{
+        {Name: "name", Usage: "who to greet", Default: "world"},
+    },
+    Action: func(ctx context.Context, args map[string]string) error {
+        fmt.Printf("Hello, %s!\n", args["name"])
+        return nil
+    },
+}
+```
+
+```bash
+./pok greet              # Hello, world!
+./pok greet name=Freddy  # Hello, Freddy!
+./pok -h greet           # show task help with arguments
+```
+
 For multi-module projects, you can define context-specific tasks that only
 appear when running the shim from that folder:
 
 ```go
-Tasks: map[string][]goyek.Task{
+Tasks: map[string][]*pocket.Task{
     ".":            {rootTask},
     "services/api": {apiTask},  // only visible from ./services/api/
 }
 ```
-
-See [goyek documentation](https://github.com/goyek/goyek) for more task options.
 
 ### Multi-Module Projects and Context Awareness
 
@@ -302,6 +327,5 @@ Examples: [`golang.Options`](tasks/golang/tasks.go),
 
 ## Acknowledgements
 
-- [goyek](https://github.com/goyek/goyek) - Powers the task system
-- [einride/sage](https://github.com/einride/sage) - Inspiration and code for the
-  tool management approach
+- [einride/sage](https://github.com/einride/sage) - Inspiration for the task
+  system and tool management approach

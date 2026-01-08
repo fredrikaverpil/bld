@@ -2,11 +2,12 @@
 package lua
 
 import (
+	"context"
+	"fmt"
 	"slices"
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tools/stylua"
-	"github.com/goyek/goyek/v3"
 )
 
 const name = "lua"
@@ -66,13 +67,27 @@ func (tg *taskGroup) ForContext(context string) pocket.TaskGroup {
 	return nil
 }
 
-func (tg *taskGroup) Tasks(cfg pocket.Config) []*goyek.DefinedTask {
+func (tg *taskGroup) Tasks(cfg pocket.Config) []*pocket.Task {
 	_ = cfg.WithDefaults()
-	var tasks []*goyek.DefinedTask
+	var tasks []*pocket.Task
+
+	var formatTask *pocket.Task
 
 	if mods := tg.modulesFor("format"); len(mods) > 0 {
-		tasks = append(tasks, goyek.Define(FormatTask(mods)))
+		formatTask = FormatTask(mods)
+		tasks = append(tasks, formatTask)
 	}
+
+	// Create orchestrator task (simple for lua - just format).
+	allTask := &pocket.Task{
+		Name:   "lua-all",
+		Usage:  "run all Lua tasks",
+		Hidden: true,
+		Action: func(ctx context.Context, _ map[string]string) error {
+			return pocket.SerialDeps(ctx, formatTask)
+		},
+	}
+	tasks = append(tasks, allTask)
 
 	return tasks
 }
@@ -90,24 +105,25 @@ func (tg *taskGroup) modulesFor(task string) map[string]Options {
 
 // FormatTask returns a task that formats Lua files using stylua.
 // The modules map specifies which directories to format and their options.
-func FormatTask(modules map[string]Options) goyek.Task {
-	return goyek.Task{
+func FormatTask(modules map[string]Options) *pocket.Task {
+	return &pocket.Task{
 		Name:  "lua-format",
 		Usage: "format Lua files",
-		Action: func(a *goyek.A) {
+		Action: func(ctx context.Context, _ map[string]string) error {
 			for mod, opts := range modules {
 				configPath := opts.Format.ConfigFile
 				if configPath == "" {
 					var err error
 					configPath, err = stylua.ConfigPath()
 					if err != nil {
-						a.Fatalf("get stylua config: %v", err)
+						return fmt.Errorf("get stylua config: %w", err)
 					}
 				}
-				if err := stylua.Run(a.Context(), "-f", configPath, mod); err != nil {
-					a.Errorf("stylua format failed in %s: %v", mod, err)
+				if err := stylua.Run(ctx, "-f", configPath, mod); err != nil {
+					return fmt.Errorf("stylua format failed in %s: %w", mod, err)
 				}
 			}
+			return nil
 		},
 	}
 }

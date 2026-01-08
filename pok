@@ -103,19 +103,4 @@ else
     echo "Go $GO_VERSION installed to $GO_INSTALL_DIR"
 fi
 
-# Insert -v before -- if present, otherwise append it
-args=()
-found_separator=false
-for arg in "$@"; do
-    if [[ "$arg" == "--" ]]; then
-        args+=("-v" "--")
-        found_separator=true
-    else
-        args+=("$arg")
-    fi
-done
-if [[ "$found_separator" == "false" ]]; then
-    args+=("-v")
-fi
-
-POK_CONTEXT="$POK_CONTEXT" "$GO_CMD" run -C "$POK_DIR" . "${args[@]}"
+POK_CONTEXT="$POK_CONTEXT" "$GO_CMD" run -C "$POK_DIR" . "$@"

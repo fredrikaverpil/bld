@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/goyek/goyek/v3"
 )
 
 func TestCalculatePocketDir(t *testing.T) {
@@ -133,7 +132,7 @@ func (tg *mockTaskGroup) Modules() map[string]pocket.ModuleConfig {
 	return result
 }
 
-func (tg *mockTaskGroup) Tasks(_ pocket.Config) []*goyek.DefinedTask { return nil }
+func (tg *mockTaskGroup) Tasks(_ pocket.Config) []*pocket.Task { return nil }
 
 func (tg *mockTaskGroup) ForContext(context string) pocket.TaskGroup {
 	if context == "." {
@@ -262,7 +261,7 @@ func TestGenerateWithRoot(t *testing.T) {
 		{
 			name: "custom tasks context",
 			config: pocket.Config{
-				Tasks: map[string][]goyek.Task{
+				Tasks: map[string][]*pocket.Task{
 					".":      nil, // Root custom tasks.
 					"deploy": nil, // Custom tasks in deploy folder.
 				},
