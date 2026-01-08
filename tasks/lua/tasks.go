@@ -33,15 +33,17 @@ type FormatOptions struct {
 // Package defines the Lua task package.
 var Package = pocket.TaskPackage[Options]{
 	Name:   "lua",
-	Detect: func() []string { return pocket.DetectByExtension(".lua") },
+	Detect: func() []string { return []string{"."} }, // Run from root.
 	Tasks: []pocket.TaskDef[Options]{
 		{Name: "lua-format", Create: FormatTask},
 	},
 }
 
-// Auto creates a Lua task group that auto-detects modules by finding directories with .lua files.
-// The defaults parameter specifies default options for all detected modules.
-// Skip patterns can be passed to exclude paths or specific tasks.
+// Auto creates a Lua task group that runs from the repository root.
+// Since Lua files are typically scattered throughout a project,
+// this defaults to running stylua from root rather than detecting individual directories.
+// The defaults parameter specifies default options.
+// Skip patterns can be passed to exclude specific tasks.
 func Auto(defaults Options, opts ...pocket.SkipOption) pocket.TaskGroup {
 	return Package.Auto(defaults, opts...)
 }
