@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -157,17 +158,25 @@ func (t *Task) Run(ctx context.Context) error {
 		}
 		// Filter out paths that should be skipped.
 		var filteredPaths []string
+		var skippedPaths []string
 		for _, p := range paths {
 			if !isSkipped(ctx, t.Name, p) {
 				filteredPaths = append(filteredPaths, p)
+			} else {
+				skippedPaths = append(skippedPaths, p)
 			}
 		}
 		// If all paths are skipped, don't run.
 		if len(filteredPaths) == 0 {
+			fmt.Printf("=== %s (skipped)\n", t.Name)
 			return
 		}
-		// Always show task name for progress feedback.
-		fmt.Printf("=== %s\n", t.Name)
+		// Show task name with any skipped paths.
+		if len(skippedPaths) > 0 {
+			fmt.Printf("=== %s (skipped in: %s)\n", t.Name, strings.Join(skippedPaths, ", "))
+		} else {
+			fmt.Printf("=== %s\n", t.Name)
+		}
 		// Ensure args map exists (may be nil if SetArgs wasn't called).
 		if t.args == nil {
 			t.SetArgs(nil)
