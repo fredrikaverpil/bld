@@ -101,10 +101,11 @@ func AutoDetect(r Runnable) *PathFilter {
 // It implements Runnable, so it can be used anywhere a Runnable is expected.
 type PathFilter struct {
 	inner   Runnable
-	include []*regexp.Regexp // explicit include patterns
-	exclude []*regexp.Regexp // exclusion patterns
-	detect  func() []string  // detection function (nil = no detection)
-	skip    []string         // task names to skip
+	include []*regexp.Regexp    // explicit include patterns
+	exclude []*regexp.Regexp    // exclusion patterns
+	detect  func() []string     // detection function (nil = no detection)
+	skip    []string            // task names to skip everywhere
+	skipIn  map[string][]string // task name -> paths where to skip
 }
 
 // In adds include patterns (regexp).
@@ -154,7 +155,7 @@ func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 	return cp
 }
 
-// Skip excludes specific tasks from execution.
+// Skip excludes specific tasks from execution everywhere.
 // Pass task instances to skip (e.g., golang.TestTask()).
 // The tasks will be skipped during Run() and excluded from Tasks() results.
 // Returns a new *PathFilter (immutable).
@@ -165,6 +166,22 @@ func (p *PathFilter) Skip(tasks ...*Task) *PathFilter {
 			cp.skip = append(cp.skip, task.Name)
 		}
 	}
+	return cp
+}
+
+// SkipIn excludes a specific task from execution only in the given paths.
+// Pass a task instance and the paths where it should be skipped.
+// Example: SkipIn(golang.TestTask(), "docs", "examples")
+// Returns a new *PathFilter (immutable).
+func (p *PathFilter) SkipIn(task *Task, paths ...string) *PathFilter {
+	if task == nil || task.Name == "" || len(paths) == 0 {
+		return p
+	}
+	cp := p.clone()
+	if cp.skipIn == nil {
+		cp.skipIn = make(map[string][]string)
+	}
+	cp.skipIn[task.Name] = append(cp.skipIn[task.Name], paths...)
 	return cp
 }
 
@@ -247,8 +264,10 @@ func (p *PathFilter) Run(ctx context.Context) error {
 	paths := p.ResolveFor(cwd)
 
 	// Set paths on all tasks in the inner Runnable.
+	// Filter paths per task based on skipIn.
 	for _, task := range p.inner.Tasks() {
-		task.SetPaths(paths)
+		taskPaths := p.filterPathsForTask(task.Name, paths)
+		task.SetPaths(taskPaths)
 	}
 
 	// Set skip list in context so tasks can check if they should be skipped.
@@ -257,6 +276,21 @@ func (p *PathFilter) Run(ctx context.Context) error {
 	}
 
 	return p.inner.Run(ctx)
+}
+
+// filterPathsForTask returns paths with skipIn paths removed for this task.
+func (p *PathFilter) filterPathsForTask(taskName string, paths []string) []string {
+	skipPaths, ok := p.skipIn[taskName]
+	if !ok || len(skipPaths) == 0 {
+		return paths
+	}
+	result := make([]string, 0, len(paths))
+	for _, path := range paths {
+		if !slices.Contains(skipPaths, path) {
+			result = append(result, path)
+		}
+	}
+	return result
 }
 
 // Tasks returns all tasks from the inner Runnable, excluding skipped tasks.
@@ -277,13 +311,20 @@ func (p *PathFilter) Tasks() []*Task {
 
 // clone creates a shallow copy of PathFilter for immutability.
 func (p *PathFilter) clone() *PathFilter {
-	return &PathFilter{
+	cp := &PathFilter{
 		inner:   p.inner,
 		include: slices.Clone(p.include),
 		exclude: slices.Clone(p.exclude),
 		detect:  p.detect,
 		skip:    slices.Clone(p.skip),
 	}
+	if p.skipIn != nil {
+		cp.skipIn = make(map[string][]string, len(p.skipIn))
+		for k, v := range p.skipIn {
+			cp.skipIn[k] = slices.Clone(v)
+		}
+	}
+	return cp
 }
 
 // matches checks if a directory matches the include patterns.

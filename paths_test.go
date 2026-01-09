@@ -369,3 +369,128 @@ func (r *runnableWithTasks) Run(ctx context.Context) error {
 func (r *runnableWithTasks) Tasks() []*Task {
 	return r.tasks
 }
+
+func TestPaths_SkipIn(t *testing.T) {
+	var executedPaths []string
+
+	task1 := &Task{
+		Name: "task1",
+		Action: func(_ context.Context, rc *RunContext) error {
+			for _, p := range rc.Paths {
+				executedPaths = append(executedPaths, "task1:"+p)
+			}
+			return nil
+		},
+	}
+
+	runnable := &runnableWithTasks{
+		tasks: []*Task{task1},
+		runFn: func(ctx context.Context) error {
+			return task1.Run(ctx)
+		},
+	}
+
+	// Detect returns 3 paths, but skip task1 in "docs".
+	p := Paths(runnable).DetectBy(func() []string {
+		return []string{"src", "docs", "examples"}
+	}).SkipIn(task1, "docs")
+
+	ctx := context.Background()
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// task1 should have run in src and examples, but not docs.
+	if len(executedPaths) != 2 {
+		t.Errorf("expected 2 paths, got %d: %v", len(executedPaths), executedPaths)
+	}
+	for _, ep := range executedPaths {
+		if ep == "task1:docs" {
+			t.Error("task1 should not have run in docs")
+		}
+	}
+}
+
+func TestPaths_SkipIn_MultiplePaths(t *testing.T) {
+	var executedPaths []string
+
+	task1 := &Task{
+		Name: "task1",
+		Action: func(_ context.Context, rc *RunContext) error {
+			executedPaths = append(executedPaths, rc.Paths...)
+			return nil
+		},
+	}
+
+	runnable := &runnableWithTasks{
+		tasks: []*Task{task1},
+		runFn: func(ctx context.Context) error {
+			return task1.Run(ctx)
+		},
+	}
+
+	// Skip in multiple paths.
+	p := Paths(runnable).DetectBy(func() []string {
+		return []string{"src", "docs", "examples", "test"}
+	}).SkipIn(task1, "docs", "test")
+
+	ctx := context.Background()
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Should only run in src and examples.
+	if len(executedPaths) != 2 {
+		t.Errorf("expected 2 paths, got %d: %v", len(executedPaths), executedPaths)
+	}
+}
+
+func TestPaths_SkipIn_AllPathsFiltered(t *testing.T) {
+	executed := false
+
+	task1 := &Task{
+		Name: "task1",
+		Action: func(_ context.Context, _ *RunContext) error {
+			executed = true
+			return nil
+		},
+	}
+
+	runnable := &runnableWithTasks{
+		tasks: []*Task{task1},
+		runFn: func(ctx context.Context) error {
+			return task1.Run(ctx)
+		},
+	}
+
+	// Skip in the only path - task should not run.
+	p := Paths(runnable).DetectBy(func() []string {
+		return []string{"docs"}
+	}).SkipIn(task1, "docs")
+
+	ctx := context.Background()
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if executed {
+		t.Error("task1 should not have executed when all paths are filtered")
+	}
+}
+
+func TestPaths_SkipIn_Immutability(t *testing.T) {
+	task1 := &Task{Name: "task1"}
+	r := &mockRunnable{tasks: []*Task{task1}}
+
+	p1 := Paths(r).In(".")
+	p2 := p1.SkipIn(task1, "docs")
+
+	// p1 should not have any skipIn.
+	if len(p1.skipIn) > 0 {
+		t.Error("p1 should not have skipIn (immutability violated)")
+	}
+	// p2 should have skipIn.
+	if p2.skipIn == nil || len(p2.skipIn["task1"]) != 1 {
+		t.Error("p2 should have skipIn for task1")
+	}
+}

@@ -114,9 +114,15 @@ func (t *Task) SetPaths(paths []string) {
 // Run executes the task's action exactly once.
 // Implements the Runnable interface.
 // If the task is in the skip list (set via PathFilter.Skip), it returns nil immediately.
+// If the task's paths were explicitly set to empty (via SkipIn), it returns nil silently.
 func (t *Task) Run(ctx context.Context) error {
 	// Check if this task should be skipped (before once.Do so it can run later if not skipped).
 	if isSkipped(ctx, t.Name) {
+		return nil
+	}
+	// Check if paths were explicitly set to empty (all paths filtered by SkipIn).
+	// t.paths != nil means SetPaths was called; len == 0 means all paths were filtered out.
+	if t.paths != nil && len(t.paths) == 0 {
 		return nil
 	}
 	t.once.Do(func() {
