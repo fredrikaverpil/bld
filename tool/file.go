@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/fredrikaverpil/pocket"
@@ -453,5 +454,5 @@ func CreateSymlink(binaryPath string) (string, error) {
 
 // isWindows returns true if running on Windows.
 func isWindows() bool {
-	return os.PathSeparator == '\\' && os.PathListSeparator == ';'
+	return runtime.GOOS == "windows"
 }
