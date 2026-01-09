@@ -99,15 +99,8 @@ func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) 
 	taskToRun.SetArgs(taskArgs)
 
 	// Create context with cancellation on interrupt.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigCh
-		cancel()
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	// Set verbose mode and cwd in context.
 	ctx = WithVerbose(ctx, *verbose)
