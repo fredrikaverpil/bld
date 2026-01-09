@@ -233,17 +233,26 @@ pocket.AutoDetect(golang.Tasks()).Except("vendor", "testdata")
 
 ### Skipping tasks
 
-Use `Skip()` to exclude specific tasks from a task group. Without paths, the
-task is skipped everywhere (global skip). With paths, it's only skipped in those
-directories (path-specific skip).
+Use `Skip()` to exclude specific tasks from a task group. This works with any
+task constructor that returns `*pocket.Task`, including bundled packages like
+`golang.TestTask()`.
+
+Skip a task everywhere (global skip):
 
 ```go
-import "github.com/fredrikaverpil/pocket/tasks/golang"
+pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask())
+```
 
-var Config = pocket.Config{
-    // Skip everywhere (global skip)
-    Run: pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask()),
-}
+Skip only in specific directories (path-specific skip):
+
+```go
+pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask(), "docs")
+```
+
+Skip in multiple directories:
+
+```go
+pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask(), "docs", "examples")
 ```
 
 Skip multiple tasks by chaining:
@@ -251,35 +260,6 @@ Skip multiple tasks by chaining:
 ```go
 pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask()).Skip(golang.VulncheckTask())
 ```
-
-Skip only in specific paths:
-
-```go
-var Config = pocket.Config{
-    // Skip only in docs directory
-    Run: pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask(), "docs"),
-}
-```
-
-Skip in multiple paths:
-
-```go
-pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask(), "docs", "examples")
-```
-
-This works with any task constructor that returns `*pocket.Task`:
-
-```go
-// Custom task constructors work too
-func MySlowTask() *pocket.Task {
-    return &pocket.Task{Name: "my-slow-task", ...}
-}
-
-pocket.Paths(myTasks).In(".").Skip(MySlowTask())
-```
-
-Globally skipped tasks are excluded from both execution and CLI help output.
-Path-specific skips remain visible in the CLI but don't run in those paths.
 
 ## Reference
 
