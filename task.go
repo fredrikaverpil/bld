@@ -79,15 +79,40 @@ func CwdFromContext(ctx context.Context) string {
 	return "."
 }
 
-// withSkipList returns a context with the skip list set.
-func withSkipList(ctx context.Context, names []string) context.Context {
-	return context.WithValue(ctx, skipKey, names)
+// SkipRule defines a rule for skipping a task.
+// If Paths is empty, the task is skipped everywhere.
+// If Paths is set, the task is only skipped in those paths.
+type SkipRule struct {
+	TaskName string
+	Paths    []string
 }
 
-// isSkipped returns true if the task name is in the skip list.
-func isSkipped(ctx context.Context, name string) bool {
-	if names, ok := ctx.Value(skipKey).([]string); ok {
-		return slices.Contains(names, name)
+// withSkipRules returns a context with the skip rules set.
+func withSkipRules(ctx context.Context, rules []SkipRule) context.Context {
+	return context.WithValue(ctx, skipKey, rules)
+}
+
+// isSkipped returns true if the task should be skipped for the given path.
+// A task is skipped if:
+// - There's a rule with matching task name and empty Paths (global skip), or
+// - There's a rule with matching task name and path is in Paths (path-specific skip).
+func isSkipped(ctx context.Context, name, path string) bool {
+	rules, ok := ctx.Value(skipKey).([]SkipRule)
+	if !ok {
+		return false
+	}
+	for _, rule := range rules {
+		if rule.TaskName != name {
+			continue
+		}
+		// Global skip (no paths specified).
+		if len(rule.Paths) == 0 {
+			return true
+		}
+		// Path-specific skip.
+		if slices.Contains(rule.Paths, path) {
+			return true
+		}
 	}
 	return false
 }
@@ -113,20 +138,32 @@ func (t *Task) SetPaths(paths []string) {
 
 // Run executes the task's action exactly once.
 // Implements the Runnable interface.
-// If the task is in the skip list (set via PathFilter.Skip), it returns nil immediately.
-// If the task's paths were explicitly set to empty (via SkipIn), it returns nil silently.
+// Skip rules from context are checked:
+// - Global skip (no paths): task doesn't run at all
+// - Path-specific skip: those paths are filtered from execution.
 func (t *Task) Run(ctx context.Context) error {
-	// Check if this task should be skipped (before once.Do so it can run later if not skipped).
-	if isSkipped(ctx, t.Name) {
-		return nil
-	}
-	// Check if paths were explicitly set to empty (all paths filtered by SkipIn).
-	// t.paths != nil means SetPaths was called; len == 0 means all paths were filtered out.
-	if t.paths != nil && len(t.paths) == 0 {
+	// Check for global skip (rule with no paths).
+	if isSkipped(ctx, t.Name, "") {
 		return nil
 	}
 	t.once.Do(func() {
 		if t.Action == nil {
+			return
+		}
+		// Determine paths, defaulting to cwd if not set.
+		paths := t.paths
+		if len(paths) == 0 {
+			paths = []string{CwdFromContext(ctx)}
+		}
+		// Filter out paths that should be skipped.
+		var filteredPaths []string
+		for _, p := range paths {
+			if !isSkipped(ctx, t.Name, p) {
+				filteredPaths = append(filteredPaths, p)
+			}
+		}
+		// If all paths are skipped, don't run.
+		if len(filteredPaths) == 0 {
 			return
 		}
 		// Always show task name for progress feedback.
@@ -135,15 +172,11 @@ func (t *Task) Run(ctx context.Context) error {
 		if t.args == nil {
 			t.SetArgs(nil)
 		}
-		// Build RunContext with resolved paths and cwd.
+		// Build RunContext with filtered paths and cwd.
 		rc := &RunContext{
 			Args:  t.args,
-			Paths: t.paths,
+			Paths: filteredPaths,
 			Cwd:   CwdFromContext(ctx),
-		}
-		// Default to cwd if no paths were set.
-		if len(rc.Paths) == 0 {
-			rc.Paths = []string{rc.Cwd}
 		}
 		t.err = t.Action(ctx, rc)
 	})

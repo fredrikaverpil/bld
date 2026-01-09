@@ -100,12 +100,11 @@ func AutoDetect(r Runnable) *PathFilter {
 // PathFilter wraps a Runnable with path filtering.
 // It implements Runnable, so it can be used anywhere a Runnable is expected.
 type PathFilter struct {
-	inner   Runnable
-	include []*regexp.Regexp    // explicit include patterns
-	exclude []*regexp.Regexp    // exclusion patterns
-	detect  func() []string     // detection function (nil = no detection)
-	skip    []string            // task names to skip everywhere
-	skipIn  map[string][]string // task name -> paths where to skip
+	inner     Runnable
+	include   []*regexp.Regexp // explicit include patterns
+	exclude   []*regexp.Regexp // exclusion patterns
+	detect    func() []string  // detection function (nil = no detection)
+	skipRules []SkipRule       // task skip rules
 }
 
 // In adds include patterns (regexp).
@@ -155,33 +154,26 @@ func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 	return cp
 }
 
-// Skip excludes specific tasks from execution everywhere.
-// Pass task instances to skip (e.g., golang.TestTask()).
-// The tasks will be skipped during Run() and excluded from Tasks() results.
+// Skip excludes a task from execution.
+// With no paths: skip everywhere, task is hidden from CLI.
+// With paths: skip only in those paths, task remains visible in CLI.
+//
+// Examples:
+//
+//	Skip(golang.TestTask())                    // skip everywhere
+//	Skip(golang.TestTask(), "docs")            // skip only in docs
+//	Skip(golang.TestTask(), "docs", "examples") // skip in docs and examples
+//
 // Returns a new *PathFilter (immutable).
-func (p *PathFilter) Skip(tasks ...*Task) *PathFilter {
-	cp := p.clone()
-	for _, task := range tasks {
-		if task != nil && task.Name != "" {
-			cp.skip = append(cp.skip, task.Name)
-		}
-	}
-	return cp
-}
-
-// SkipIn excludes a specific task from execution only in the given paths.
-// Pass a task instance and the paths where it should be skipped.
-// Example: SkipIn(golang.TestTask(), "docs", "examples")
-// Returns a new *PathFilter (immutable).
-func (p *PathFilter) SkipIn(task *Task, paths ...string) *PathFilter {
-	if task == nil || task.Name == "" || len(paths) == 0 {
+func (p *PathFilter) Skip(task *Task, paths ...string) *PathFilter {
+	if task == nil || task.Name == "" {
 		return p
 	}
 	cp := p.clone()
-	if cp.skipIn == nil {
-		cp.skipIn = make(map[string][]string)
-	}
-	cp.skipIn[task.Name] = append(cp.skipIn[task.Name], paths...)
+	cp.skipRules = append(cp.skipRules, SkipRule{
+		TaskName: task.Name,
+		Paths:    paths,
+	})
 	return cp
 }
 
@@ -264,45 +256,39 @@ func (p *PathFilter) Run(ctx context.Context) error {
 	paths := p.ResolveFor(cwd)
 
 	// Set paths on all tasks in the inner Runnable.
-	// Filter paths per task based on skipIn.
 	for _, task := range p.inner.Tasks() {
-		taskPaths := p.filterPathsForTask(task.Name, paths)
-		task.SetPaths(taskPaths)
+		task.SetPaths(paths)
 	}
 
-	// Set skip list in context so tasks can check if they should be skipped.
-	if len(p.skip) > 0 {
-		ctx = withSkipList(ctx, p.skip)
+	// Set skip rules in context so tasks can check if they should be skipped.
+	if len(p.skipRules) > 0 {
+		ctx = withSkipRules(ctx, p.skipRules)
 	}
 
 	return p.inner.Run(ctx)
 }
 
-// filterPathsForTask returns paths with skipIn paths removed for this task.
-func (p *PathFilter) filterPathsForTask(taskName string, paths []string) []string {
-	skipPaths, ok := p.skipIn[taskName]
-	if !ok || len(skipPaths) == 0 {
-		return paths
-	}
-	result := make([]string, 0, len(paths))
-	for _, path := range paths {
-		if !slices.Contains(skipPaths, path) {
-			result = append(result, path)
-		}
-	}
-	return result
-}
-
-// Tasks returns all tasks from the inner Runnable, excluding skipped tasks.
+// Tasks returns all tasks from the inner Runnable, excluding globally skipped tasks.
+// Tasks with path-specific skips are still included (they run in other paths).
 func (p *PathFilter) Tasks() []*Task {
 	tasks := p.inner.Tasks()
-	if len(p.skip) == 0 {
+	if len(p.skipRules) == 0 {
 		return tasks
 	}
-	// Filter out skipped tasks.
+	// Build set of globally skipped task names (rules with no paths).
+	globalSkips := make(map[string]bool)
+	for _, rule := range p.skipRules {
+		if len(rule.Paths) == 0 {
+			globalSkips[rule.TaskName] = true
+		}
+	}
+	if len(globalSkips) == 0 {
+		return tasks
+	}
+	// Filter out globally skipped tasks.
 	result := make([]*Task, 0, len(tasks))
 	for _, task := range tasks {
-		if !slices.Contains(p.skip, task.Name) {
+		if !globalSkips[task.Name] {
 			result = append(result, task)
 		}
 	}
@@ -312,17 +298,11 @@ func (p *PathFilter) Tasks() []*Task {
 // clone creates a shallow copy of PathFilter for immutability.
 func (p *PathFilter) clone() *PathFilter {
 	cp := &PathFilter{
-		inner:   p.inner,
-		include: slices.Clone(p.include),
-		exclude: slices.Clone(p.exclude),
-		detect:  p.detect,
-		skip:    slices.Clone(p.skip),
-	}
-	if p.skipIn != nil {
-		cp.skipIn = make(map[string][]string, len(p.skipIn))
-		for k, v := range p.skipIn {
-			cp.skipIn[k] = slices.Clone(v)
-		}
+		inner:     p.inner,
+		include:   slices.Clone(p.include),
+		exclude:   slices.Clone(p.exclude),
+		detect:    p.detect,
+		skipRules: slices.Clone(p.skipRules),
 	}
 	return cp
 }

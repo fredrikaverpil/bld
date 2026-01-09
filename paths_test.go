@@ -267,7 +267,7 @@ func TestPaths_Skip_Multiple(t *testing.T) {
 	task3 := &Task{Name: "test-build", Usage: "build code"}
 
 	r := &mockRunnable{tasks: []*Task{task1, task2, task3}}
-	p := Paths(r).In(".").Skip(&Task{Name: "test-lint"}, &Task{Name: "test-build"})
+	p := Paths(r).In(".").Skip(&Task{Name: "test-lint"}).Skip(&Task{Name: "test-build"})
 
 	tasks := p.Tasks()
 	if len(tasks) != 1 {
@@ -334,11 +334,8 @@ func TestPaths_Skip_Run(t *testing.T) {
 		},
 	}
 
-	// Skip task2 using task name directly (simulating extractTaskName result).
-	p := &PathFilter{
-		inner: runnable,
-		skip:  []string{"task2"},
-	}
+	// Skip task2 using Skip method.
+	p := Paths(runnable).In(".").Skip(task2)
 
 	ctx := context.Background()
 	if err := p.Run(ctx); err != nil {
@@ -370,7 +367,7 @@ func (r *runnableWithTasks) Tasks() []*Task {
 	return r.tasks
 }
 
-func TestPaths_SkipIn(t *testing.T) {
+func TestPaths_Skip_InPath(t *testing.T) {
 	var executedPaths []string
 
 	task1 := &Task{
@@ -393,7 +390,7 @@ func TestPaths_SkipIn(t *testing.T) {
 	// Detect returns 3 paths, but skip task1 in "docs".
 	p := Paths(runnable).DetectBy(func() []string {
 		return []string{"src", "docs", "examples"}
-	}).SkipIn(task1, "docs")
+	}).Skip(task1, "docs")
 
 	ctx := context.Background()
 	if err := p.Run(ctx); err != nil {
@@ -411,7 +408,7 @@ func TestPaths_SkipIn(t *testing.T) {
 	}
 }
 
-func TestPaths_SkipIn_MultiplePaths(t *testing.T) {
+func TestPaths_Skip_InMultiplePaths(t *testing.T) {
 	var executedPaths []string
 
 	task1 := &Task{
@@ -432,7 +429,7 @@ func TestPaths_SkipIn_MultiplePaths(t *testing.T) {
 	// Skip in multiple paths.
 	p := Paths(runnable).DetectBy(func() []string {
 		return []string{"src", "docs", "examples", "test"}
-	}).SkipIn(task1, "docs", "test")
+	}).Skip(task1, "docs", "test")
 
 	ctx := context.Background()
 	if err := p.Run(ctx); err != nil {
@@ -445,7 +442,7 @@ func TestPaths_SkipIn_MultiplePaths(t *testing.T) {
 	}
 }
 
-func TestPaths_SkipIn_AllPathsFiltered(t *testing.T) {
+func TestPaths_Skip_AllPathsFiltered(t *testing.T) {
 	executed := false
 
 	task1 := &Task{
@@ -466,7 +463,7 @@ func TestPaths_SkipIn_AllPathsFiltered(t *testing.T) {
 	// Skip in the only path - task should not run.
 	p := Paths(runnable).DetectBy(func() []string {
 		return []string{"docs"}
-	}).SkipIn(task1, "docs")
+	}).Skip(task1, "docs")
 
 	ctx := context.Background()
 	if err := p.Run(ctx); err != nil {
@@ -478,19 +475,22 @@ func TestPaths_SkipIn_AllPathsFiltered(t *testing.T) {
 	}
 }
 
-func TestPaths_SkipIn_Immutability(t *testing.T) {
+func TestPaths_Skip_WithPaths_Immutability(t *testing.T) {
 	task1 := &Task{Name: "task1"}
 	r := &mockRunnable{tasks: []*Task{task1}}
 
 	p1 := Paths(r).In(".")
-	p2 := p1.SkipIn(task1, "docs")
+	p2 := p1.Skip(task1, "docs")
 
-	// p1 should not have any skipIn.
-	if len(p1.skipIn) > 0 {
-		t.Error("p1 should not have skipIn (immutability violated)")
+	// p1 should not have any skip rules.
+	if len(p1.skipRules) > 0 {
+		t.Error("p1 should not have skipRules (immutability violated)")
 	}
-	// p2 should have skipIn.
-	if p2.skipIn == nil || len(p2.skipIn["task1"]) != 1 {
-		t.Error("p2 should have skipIn for task1")
+	// p2 should have skipRules with path-specific rule.
+	if len(p2.skipRules) != 1 {
+		t.Error("p2 should have 1 skipRule for task1")
+	}
+	if len(p2.skipRules[0].Paths) != 1 || p2.skipRules[0].Paths[0] != "docs" {
+		t.Error("p2 skipRule should have 'docs' path")
 	}
 }
