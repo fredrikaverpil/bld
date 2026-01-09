@@ -6,7 +6,6 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -22,22 +21,13 @@ const version = "2.3.1"
 //go:embed stylua.toml
 var defaultConfig []byte
 
+var t = &tool.Tool{Name: name, Prepare: Prepare}
+
 // Command prepares the tool and returns an exec.Cmd for running stylua.
-func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
-	if err := Prepare(ctx); err != nil {
-		return nil, err
-	}
-	return pocket.Command(ctx, pocket.FromBinDir(pocket.BinaryName(name)), args...), nil
-}
+var Command = t.Command
 
 // Run installs (if needed) and executes stylua.
-func Run(ctx context.Context, args ...string) error {
-	cmd, err := Command(ctx, args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
-}
+var Run = t.Run
 
 // ConfigPath returns the path to the stylua config file.
 // It checks for stylua.toml in the repo root first, then falls back

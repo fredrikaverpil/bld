@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -25,22 +24,13 @@ const pythonVersion = "3.13"
 //go:embed requirements.txt
 var requirements []byte
 
+var t = &tool.Tool{Name: name, Prepare: Prepare}
+
 // Command prepares the tool and returns an exec.Cmd for running mdformat.
-func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
-	if err := Prepare(ctx); err != nil {
-		return nil, err
-	}
-	return pocket.Command(ctx, pocket.FromBinDir(pocket.BinaryName(name)), args...), nil
-}
+var Command = t.Command
 
 // Run installs (if needed) and executes mdformat.
-func Run(ctx context.Context, args ...string) error {
-	cmd, err := Command(ctx, args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
-}
+var Run = t.Run
 
 // versionHash creates a unique hash based on requirements and Python version.
 // This ensures the venv is recreated when dependencies or Python version change.

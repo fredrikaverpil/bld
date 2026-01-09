@@ -4,7 +4,6 @@ package uv
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -17,22 +16,13 @@ const name = "uv"
 // renovate: datasource=github-releases depName=astral-sh/uv
 const version = "0.7.13"
 
+var t = &tool.Tool{Name: name, Prepare: Prepare}
+
 // Command prepares the tool and returns an exec.Cmd for running uv.
-func Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
-	if err := Prepare(ctx); err != nil {
-		return nil, err
-	}
-	return pocket.Command(ctx, pocket.FromBinDir(pocket.BinaryName(name)), args...), nil
-}
+var Command = t.Command
 
 // Run installs (if needed) and executes uv.
-func Run(ctx context.Context, args ...string) error {
-	cmd, err := Command(ctx, args...)
-	if err != nil {
-		return err
-	}
-	return cmd.Run()
-}
+var Run = t.Run
 
 // CreateVenv creates a Python virtual environment at the specified path.
 // If pythonVersion is empty, uv uses the default Python available.
