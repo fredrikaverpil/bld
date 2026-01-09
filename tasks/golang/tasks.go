@@ -4,6 +4,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tools/golangcilint"
@@ -16,17 +17,13 @@ type Options struct {
 	// If empty, uses the default config from pocket.
 	LintConfig string
 
-	// TestRace enables race detection in tests.
-	// Default: true
-	TestRace *bool
-}
+	// SkipRace disables race detection in tests.
+	// Default: false (race detection enabled)
+	SkipRace bool
 
-// testRace returns the effective TestRace value (defaults to true).
-func (o Options) testRace() bool {
-	if o.TestRace == nil {
-		return true
-	}
-	return *o.TestRace
+	// SkipCoverage disables coverage output.
+	// Default: false (coverage enabled, writes to coverage.out)
+	SkipCoverage bool
 }
 
 // Tasks returns a Runnable that executes all Go tasks.
@@ -163,7 +160,7 @@ func LintTask(opts ...Options) *pocket.Task {
 	}
 }
 
-// TestTask returns a task that runs Go tests with race detection.
+// TestTask returns a task that runs Go tests with race detection and coverage.
 func TestTask(opts ...Options) *pocket.Task {
 	var o Options
 	if len(opts) > 0 {
@@ -178,8 +175,18 @@ func TestTask(opts ...Options) *pocket.Task {
 				if pocket.IsVerbose(ctx) {
 					args = append(args, "-v")
 				}
-				if o.testRace() {
+				if !o.SkipRace {
 					args = append(args, "-race")
+				}
+				if !o.SkipCoverage {
+					// Name coverage file based on directory to avoid overwrites.
+					coverName := "coverage.out"
+					if dir != "." {
+						// Replace path separators with dashes for valid filename.
+						coverName = "coverage-" + strings.ReplaceAll(dir, "/", "-") + ".out"
+					}
+					coverFile := pocket.FromGitRoot(coverName)
+					args = append(args, "-coverprofile="+coverFile)
 				}
 				args = append(args, "./...")
 
