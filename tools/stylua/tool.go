@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 
@@ -29,31 +28,17 @@ var Command = t.Command
 // Run installs (if needed) and executes stylua.
 var Run = t.Run
 
+var configSpec = tool.ConfigSpec{
+	ToolName:          name,
+	UserConfigNames:   []string{"stylua.toml", ".stylua.toml"},
+	DefaultConfigName: "stylua.toml",
+	DefaultConfig:     defaultConfig,
+}
+
 // ConfigPath returns the path to the stylua config file.
 // It checks for stylua.toml in the repo root first, then falls back
 // to the bundled default config.
-func ConfigPath() (string, error) {
-	// Check for user config in repo root
-	repoConfig := pocket.FromGitRoot("stylua.toml")
-	if _, err := os.Stat(repoConfig); err == nil {
-		return repoConfig, nil
-	}
-
-	// Write bundled config to .pocket/tools/stylua/stylua.toml
-	configDir := pocket.FromToolsDir(name)
-	configPath := filepath.Join(configDir, "stylua.toml")
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDir, 0o755); err != nil {
-			return "", fmt.Errorf("create config dir: %w", err)
-		}
-		if err := os.WriteFile(configPath, defaultConfig, 0o644); err != nil {
-			return "", fmt.Errorf("write default config: %w", err)
-		}
-	}
-
-	return configPath, nil
-}
+var ConfigPath = configSpec.Path
 
 // Prepare ensures stylua is installed.
 func Prepare(ctx context.Context) error {

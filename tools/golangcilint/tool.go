@@ -5,7 +5,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 
@@ -29,37 +28,17 @@ var Command = t.Command
 // Run installs (if needed) and executes golangci-lint.
 var Run = t.Run
 
-// ConfigPath returns the path to the golangci-lint config file.
-// It checks for .golangci.yml in the repo root first, then falls back
-// to the bundled default config.
-func ConfigPath() (string, error) {
-	// Check for user config in repo root
-	repoConfig := pocket.FromGitRoot(".golangci.yml")
-	if _, err := os.Stat(repoConfig); err == nil {
-		return repoConfig, nil
-	}
-
-	// Also check for .golangci.yaml
-	repoConfigYaml := pocket.FromGitRoot(".golangci.yaml")
-	if _, err := os.Stat(repoConfigYaml); err == nil {
-		return repoConfigYaml, nil
-	}
-
-	// Write bundled config to .pocket/tools/golangci-lint/golangci.yml
-	configDir := pocket.FromToolsDir(name)
-	configPath := filepath.Join(configDir, "golangci.yml")
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(configDir, 0o755); err != nil {
-			return "", fmt.Errorf("create config dir: %w", err)
-		}
-		if err := os.WriteFile(configPath, defaultConfig, 0o644); err != nil {
-			return "", fmt.Errorf("write default config: %w", err)
-		}
-	}
-
-	return configPath, nil
+var configSpec = tool.ConfigSpec{
+	ToolName:          name,
+	UserConfigNames:   []string{".golangci.yml", ".golangci.yaml"},
+	DefaultConfigName: "golangci.yml",
+	DefaultConfig:     defaultConfig,
 }
+
+// ConfigPath returns the path to the golangci-lint config file.
+// It checks for .golangci.yml or .golangci.yaml in the repo root first,
+// then falls back to the bundled default config.
+var ConfigPath = configSpec.Path
 
 // Prepare ensures golangci-lint is installed.
 func Prepare(ctx context.Context) error {
