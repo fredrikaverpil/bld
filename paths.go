@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 )
 
@@ -338,13 +339,7 @@ func containsRegexMeta(s string) bool {
 	if s == "." {
 		return false
 	}
-	for _, c := range s {
-		switch c {
-		case '.', '*', '+', '?', '[', ']', '(', ')', '{', '}', '|', '^', '$', '\\':
-			return true
-		}
-	}
-	return false
+	return strings.ContainsAny(s, `.+*?[](){}|^$\`)
 }
 
 // CollectPathMappings walks a Runnable tree and returns a map from task name to PathFilter.

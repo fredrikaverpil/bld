@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -40,8 +41,8 @@ func PrependPath(env []string, dir string) []string {
 	result := make([]string, 0, len(env)+1)
 	pathSet := false
 	for _, e := range env {
-		if len(e) > 5 && e[:5] == "PATH=" {
-			result = append(result, "PATH="+dir+string(os.PathListSeparator)+e[5:])
+		if oldPath, found := strings.CutPrefix(e, "PATH="); found {
+			result = append(result, "PATH="+dir+string(os.PathListSeparator)+oldPath)
 			pathSet = true
 		} else {
 			result = append(result, e)
