@@ -43,7 +43,7 @@ func GoInstall(ctx context.Context, pkg, version string) (string, error) {
 	// Run go install with GOBIN set to install directly to tool directory.
 	pkgWithVersion := pkg + "@" + version
 	cmd := pocket.Command(ctx, "go", "install", pkgWithVersion)
-	cmd.Env = append(os.Environ(), "GOBIN="+toolDir)
+	cmd.Env = append(cmd.Env, "GOBIN="+toolDir)
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("go install %s: %w", pkgWithVersion, err)
