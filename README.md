@@ -176,6 +176,12 @@ pocket.Paths(myTask).In("services/.*").Except("services/legacy")
 
 Running `./pok` from a subdirectory shows only tasks relevant to that directory.
 
+You can also run multiple tasks in the same path:
+
+```go
+pocket.Paths(myTask1, myTask2, myTask3).In(pocket.FromGitRoot("docs"))
+```
+
 ### Bundled task packages
 
 Pocket includes ready-made task packages for common languages:
