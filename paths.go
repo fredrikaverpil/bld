@@ -5,7 +5,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"runtime"
 	"slices"
@@ -156,57 +155,17 @@ func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 }
 
 // Skip excludes specific tasks from execution.
-// Accepts task constructor functions (e.g., golang.TestTask) and uses reflection
-// to extract task names. The tasks will be skipped during Run() and excluded
-// from Tasks() results.
+// Pass task instances to skip (e.g., golang.TestTask()).
+// The tasks will be skipped during Run() and excluded from Tasks() results.
 // Returns a new *PathFilter (immutable).
-func (p *PathFilter) Skip(taskFns ...any) *PathFilter {
+func (p *PathFilter) Skip(tasks ...*Task) *PathFilter {
 	cp := p.clone()
-	for _, fn := range taskFns {
-		name := extractTaskName(fn)
-		if name != "" {
-			cp.skip = append(cp.skip, name)
+	for _, task := range tasks {
+		if task != nil && task.Name != "" {
+			cp.skip = append(cp.skip, task.Name)
 		}
 	}
 	return cp
-}
-
-// extractTaskName uses reflection to call a task constructor function
-// with zero-value arguments and extract the task name.
-func extractTaskName(fn any) string {
-	v := reflect.ValueOf(fn)
-	if v.Kind() != reflect.Func {
-		return ""
-	}
-
-	t := v.Type()
-	// Must return exactly one value of type *Task.
-	if t.NumOut() != 1 {
-		return ""
-	}
-	outType := t.Out(0)
-	taskPtrType := reflect.TypeFor[*Task]()
-	if outType != taskPtrType {
-		return ""
-	}
-
-	// Build zero-value arguments.
-	args := make([]reflect.Value, t.NumIn())
-	for i := range args {
-		args[i] = reflect.Zero(t.In(i))
-	}
-
-	// Call the function.
-	results := v.Call(args)
-	if len(results) == 0 {
-		return ""
-	}
-
-	task, ok := results[0].Interface().(*Task)
-	if !ok || task == nil {
-		return ""
-	}
-	return task.Name
 }
 
 // Resolve returns all directories where this Runnable should run.

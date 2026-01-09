@@ -233,21 +233,21 @@ pocket.AutoDetect(golang.Tasks()).Except("vendor", "testdata")
 
 ### Skipping tasks
 
-Use `Skip()` to exclude specific tasks from a task group. Pass the task
-constructor function directly - pocket uses reflection to extract the task name:
+Use `Skip()` to exclude specific tasks from a task group. Pass task instances to
+identify which tasks to skip:
 
 ```go
 import "github.com/fredrikaverpil/pocket/tasks/golang"
 
 var Config = pocket.Config{
-    Run: pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask),
+    Run: pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask()),
 }
 ```
 
 Skip multiple tasks:
 
 ```go
-pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask, golang.VulncheckTask)
+pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask(), golang.VulncheckTask())
 ```
 
 This works with any task constructor that returns `*pocket.Task`:
@@ -258,7 +258,7 @@ func MySlowTask() *pocket.Task {
     return &pocket.Task{Name: "my-slow-task", ...}
 }
 
-pocket.Paths(myTasks).In(".").Skip(MySlowTask)
+pocket.Paths(myTasks).In(".").Skip(MySlowTask())
 ```
 
 Skipped tasks are excluded from both execution and CLI help output.

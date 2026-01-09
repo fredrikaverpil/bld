@@ -240,78 +240,14 @@ func TestCollectModuleDirectories(t *testing.T) {
 	}
 }
 
-// Task constructor functions for Skip tests.
-func testFormatTask() *Task {
-	return &Task{Name: "test-format", Usage: "format code"}
-}
-
-func testLintTask() *Task {
-	return &Task{Name: "test-lint", Usage: "lint code"}
-}
-
-func testBuildTask() *Task {
-	return &Task{Name: "test-build", Usage: "build code"}
-}
-
-// Task constructor with options (like golang.TestTask).
-type testOptions struct {
-	Verbose bool
-}
-
-func testTaskWithOptions(_ testOptions) *Task {
-	return &Task{Name: "test-with-options", Usage: "task with options"}
-}
-
-func TestExtractTaskName(t *testing.T) {
-	tests := []struct {
-		name     string
-		fn       any
-		expected string
-	}{
-		{
-			name:     "simple task constructor",
-			fn:       testFormatTask,
-			expected: "test-format",
-		},
-		{
-			name:     "task constructor with options",
-			fn:       testTaskWithOptions,
-			expected: "test-with-options",
-		},
-		{
-			name:     "non-function",
-			fn:       "not a function",
-			expected: "",
-		},
-		{
-			name:     "nil",
-			fn:       nil,
-			expected: "",
-		},
-		{
-			name:     "wrong return type",
-			fn:       func() string { return "not a task" },
-			expected: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := extractTaskName(tt.fn)
-			if got != tt.expected {
-				t.Errorf("extractTaskName() = %q, want %q", got, tt.expected)
-			}
-		})
-	}
-}
-
 func TestPaths_Skip(t *testing.T) {
-	task1 := testFormatTask()
-	task2 := testLintTask()
-	task3 := testBuildTask()
+	task1 := &Task{Name: "test-format", Usage: "format code"}
+	task2 := &Task{Name: "test-lint", Usage: "lint code"}
+	task3 := &Task{Name: "test-build", Usage: "build code"}
 
 	r := &mockRunnable{tasks: []*Task{task1, task2, task3}}
-	p := Paths(r).In(".").Skip(testLintTask)
+	// Pass a task instance with the same name to skip.
+	p := Paths(r).In(".").Skip(&Task{Name: "test-lint"})
 
 	// Tasks() should exclude the skipped task.
 	tasks := p.Tasks()
@@ -326,12 +262,12 @@ func TestPaths_Skip(t *testing.T) {
 }
 
 func TestPaths_Skip_Multiple(t *testing.T) {
-	task1 := testFormatTask()
-	task2 := testLintTask()
-	task3 := testBuildTask()
+	task1 := &Task{Name: "test-format", Usage: "format code"}
+	task2 := &Task{Name: "test-lint", Usage: "lint code"}
+	task3 := &Task{Name: "test-build", Usage: "build code"}
 
 	r := &mockRunnable{tasks: []*Task{task1, task2, task3}}
-	p := Paths(r).In(".").Skip(testLintTask, testBuildTask)
+	p := Paths(r).In(".").Skip(&Task{Name: "test-lint"}, &Task{Name: "test-build"})
 
 	tasks := p.Tasks()
 	if len(tasks) != 1 {
@@ -343,12 +279,12 @@ func TestPaths_Skip_Multiple(t *testing.T) {
 }
 
 func TestPaths_Skip_Immutability(t *testing.T) {
-	task1 := testFormatTask()
-	task2 := testLintTask()
+	task1 := &Task{Name: "test-format", Usage: "format code"}
+	task2 := &Task{Name: "test-lint", Usage: "lint code"}
 
 	r := &mockRunnable{tasks: []*Task{task1, task2}}
 	p1 := Paths(r).In(".")
-	p2 := p1.Skip(testLintTask)
+	p2 := p1.Skip(&Task{Name: "test-lint"})
 
 	// p1 should still have both tasks.
 	if len(p1.Tasks()) != 2 {
