@@ -36,7 +36,6 @@ type shimType struct {
 	name      string // Template name for errors.
 	template  string // Template content.
 	extension string // File extension (empty for posix).
-	pathSep   string // Path separator to use in template output.
 }
 
 // Generate creates or updates wrapper scripts for all contexts.
@@ -68,7 +67,6 @@ func GenerateWithRoot(cfg pocket.Config, rootDir string) error {
 			name:      "posix",
 			template:  posixTemplate,
 			extension: "",
-			pathSep:   "/",
 		})
 	}
 	if cfg.Shim.Windows {
@@ -76,7 +74,6 @@ func GenerateWithRoot(cfg pocket.Config, rootDir string) error {
 			name:      "windows",
 			template:  windowsTemplate,
 			extension: ".cmd",
-			pathSep:   "\\",
 		})
 	}
 	if cfg.Shim.PowerShell {
@@ -84,7 +81,6 @@ func GenerateWithRoot(cfg pocket.Config, rootDir string) error {
 			name:      "powershell",
 			template:  powershellTemplate,
 			extension: ".ps1",
-			pathSep:   "\\",
 		})
 	}
 
