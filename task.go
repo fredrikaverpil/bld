@@ -39,8 +39,8 @@ type Task struct {
 	Usage   string
 	Options TaskOptions // typed options struct for CLI parsing (see args.go)
 	Action  TaskAction  // function to execute when task runs
-	Hidden  bool
-	Builtin bool // true for core tasks like generate, update, git-diff
+	Hidden  bool        // hide from CLI shim
+	Builtin bool        // true for core tasks like generate, update, git-diff
 
 	// once ensures the task runs exactly once per execution.
 	once sync.Once
