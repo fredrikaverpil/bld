@@ -105,7 +105,7 @@ type PathFilter struct {
 	include   []*regexp.Regexp // explicit include patterns
 	exclude   []*regexp.Regexp // exclusion patterns
 	detect    func() []string  // detection function (nil = no detection)
-	skipRules []SkipRule       // task skip rules
+	skipRules []skipRule       // task skip rules
 }
 
 // In adds include patterns (regexp).
@@ -171,9 +171,9 @@ func (p *PathFilter) Skip(task *Task, paths ...string) *PathFilter {
 		return p
 	}
 	cp := p.clone()
-	cp.skipRules = append(cp.skipRules, SkipRule{
-		TaskName: task.Name,
-		Paths:    paths,
+	cp.skipRules = append(cp.skipRules, skipRule{
+		taskName: task.Name,
+		paths:    paths,
 	})
 	return cp
 }
@@ -279,8 +279,8 @@ func (p *PathFilter) Tasks() []*Task {
 	// Build set of globally skipped task names (rules with no paths).
 	globalSkips := make(map[string]bool)
 	for _, rule := range p.skipRules {
-		if len(rule.Paths) == 0 {
-			globalSkips[rule.TaskName] = true
+		if len(rule.paths) == 0 {
+			globalSkips[rule.taskName] = true
 		}
 	}
 	if len(globalSkips) == 0 {

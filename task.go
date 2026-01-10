@@ -92,16 +92,16 @@ func cwdFromContext(ctx context.Context) string {
 	return "."
 }
 
-// SkipRule defines a rule for skipping a task.
+// skipRule defines a rule for skipping a task.
 // If Paths is empty, the task is skipped everywhere.
 // If Paths is set, the task is only skipped in those paths.
-type SkipRule struct {
-	TaskName string
-	Paths    []string
+type skipRule struct {
+	taskName string
+	paths    []string
 }
 
 // withSkipRules returns a context with the skip rules set.
-func withSkipRules(ctx context.Context, rules []SkipRule) context.Context {
+func withSkipRules(ctx context.Context, rules []skipRule) context.Context {
 	return context.WithValue(ctx, skipKey, rules)
 }
 
@@ -110,20 +110,20 @@ func withSkipRules(ctx context.Context, rules []SkipRule) context.Context {
 // - There's a rule with matching task name and empty Paths (global skip), or
 // - There's a rule with matching task name and path is in Paths (path-specific skip).
 func isSkipped(ctx context.Context, name, path string) bool {
-	rules, ok := ctx.Value(skipKey).([]SkipRule)
+	rules, ok := ctx.Value(skipKey).([]skipRule)
 	if !ok {
 		return false
 	}
 	for _, rule := range rules {
-		if rule.TaskName != name {
+		if rule.taskName != name {
 			continue
 		}
 		// Global skip (no paths specified).
-		if len(rule.Paths) == 0 {
+		if len(rule.paths) == 0 {
 			return true
 		}
 		// Path-specific skip.
-		if slices.Contains(rule.Paths, path) {
+		if slices.Contains(rule.paths, path) {
 			return true
 		}
 	}

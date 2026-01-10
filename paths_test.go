@@ -490,7 +490,7 @@ func TestPaths_Skip_WithPaths_Immutability(t *testing.T) {
 	if len(p2.skipRules) != 1 {
 		t.Error("p2 should have 1 skipRule for task1")
 	}
-	if len(p2.skipRules[0].Paths) != 1 || p2.skipRules[0].Paths[0] != "docs" {
+	if len(p2.skipRules[0].paths) != 1 || p2.skipRules[0].paths[0] != "docs" {
 		t.Error("p2 skipRule should have 'docs' path")
 	}
 }
