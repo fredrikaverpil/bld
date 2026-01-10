@@ -18,8 +18,6 @@ pocket handle tool installation.
 
 - **Cross-platform**: No Makefiles - works on Windows, macOS, and Linux
 - **Task management**: Define tasks with `Serial()` and `Parallel()` execution
-- **Auto-run & manual tasks**: `AutoRun` tasks execute on `./pok`, `ManualRun`
-  tasks require `./pok <name>`
 - **Tool management**: Downloads and caches tools in `.pocket/`
 - **Simple invocation**: Just `./pok` or `./pok -h` to list tasks
 
