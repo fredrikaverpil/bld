@@ -22,6 +22,8 @@ type RunContext struct {
 	Paths   []string          // resolved paths for this task (from Paths wrapper)
 	Cwd     string            // current working directory (relative to git root)
 	Verbose bool              // verbose mode enabled
+
+	skipRules []skipRule // internal: task skip rules (not visible to Actions in other packages)
 }
 
 // ForEachPath executes fn for each path in the context.
@@ -57,7 +59,7 @@ type Task struct {
 // contextKey is the type for context keys used by this package.
 type contextKey int
 
-const runConfigKey contextKey = 0
+const runContextKey contextKey = 0
 
 // skipRule defines a rule for skipping a task.
 type skipRule struct {
@@ -65,42 +67,33 @@ type skipRule struct {
 	paths    []string // empty = skip everywhere, non-empty = skip only in these paths
 }
 
-// runConfig holds runtime configuration passed through context.
-// This consolidates all run-time state into a single context value.
-type runConfig struct {
-	verbose   bool
-	cwd       string     // relative to git root, defaults to "."
-	skipRules []skipRule // task skip rules from PathFilter.Skip()
-}
-
-// runConfigFromContext returns the run configuration from context.
-func runConfigFromContext(ctx context.Context) *runConfig {
-	if cfg, ok := ctx.Value(runConfigKey).(*runConfig); ok {
-		return cfg
+// getRunContext returns the RunContext from context.
+func getRunContext(ctx context.Context) *RunContext {
+	if rc, ok := ctx.Value(runContextKey).(*RunContext); ok {
+		return rc
 	}
-	return &runConfig{cwd: "."}
+	return &RunContext{Cwd: "."}
 }
 
-// withRunConfig returns a context with the run configuration set.
-func withRunConfig(ctx context.Context, cfg *runConfig) context.Context {
-	return context.WithValue(ctx, runConfigKey, cfg)
+// withRunContext returns a context with the RunContext set.
+func withRunContext(ctx context.Context, rc *RunContext) context.Context {
+	return context.WithValue(ctx, runContextKey, rc)
 }
 
-// withSkipRules returns a new context with skip rules added to the run config.
+// withSkipRules returns a new context with skip rules added.
 func withSkipRules(ctx context.Context, rules []skipRule) context.Context {
-	cfg := runConfigFromContext(ctx)
-	newCfg := &runConfig{
-		verbose:   cfg.verbose,
-		cwd:       cfg.cwd,
+	rc := getRunContext(ctx)
+	return withRunContext(ctx, &RunContext{
+		Verbose:   rc.Verbose,
+		Cwd:       rc.Cwd,
 		skipRules: rules,
-	}
-	return withRunConfig(ctx, newCfg)
+	})
 }
 
 // isSkipped returns true if the task should be skipped for the given path.
 func isSkipped(ctx context.Context, name, path string) bool {
-	cfg := runConfigFromContext(ctx)
-	for _, rule := range cfg.skipRules {
+	rc := getRunContext(ctx)
+	for _, rule := range rc.skipRules {
 		if rule.taskName != name {
 			continue
 		}
@@ -147,11 +140,11 @@ func (t *Task) Run(ctx context.Context) error {
 		if t.Action == nil {
 			return
 		}
-		cfg := runConfigFromContext(ctx)
+		base := getRunContext(ctx)
 		// Determine paths, defaulting to cwd if not set.
 		paths := t.paths
 		if len(paths) == 0 {
-			paths = []string{cfg.cwd}
+			paths = []string{base.Cwd}
 		}
 		// Filter out paths that should be skipped.
 		var filteredPaths []string
@@ -178,12 +171,12 @@ func (t *Task) Run(ctx context.Context) error {
 		if t.args == nil {
 			t.SetArgs(nil)
 		}
-		// Build RunContext from run config.
+		// Build RunContext for this task.
 		rc := &RunContext{
 			Args:    t.args,
 			Paths:   filteredPaths,
-			Cwd:     cfg.cwd,
-			Verbose: cfg.verbose,
+			Cwd:     base.Cwd,
+			Verbose: base.Verbose,
 		}
 		t.err = t.Action(ctx, rc)
 	})

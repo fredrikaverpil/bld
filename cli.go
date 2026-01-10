@@ -104,10 +104,10 @@ func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Set run configuration in context.
-	ctx = withRunConfig(ctx, &runConfig{
-		verbose: *verbose,
-		cwd:     cwd,
+	// Set run context.
+	ctx = withRunContext(ctx, &RunContext{
+		Verbose: *verbose,
+		Cwd:     cwd,
 	})
 
 	// Run the task.
