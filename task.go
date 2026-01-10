@@ -77,15 +77,15 @@ func isVerbose(ctx context.Context) bool {
 	return v
 }
 
-// WithCwd returns a context with the current working directory set.
+// withCwd returns a context with the current working directory set.
 // The cwd should be relative to git root.
-func WithCwd(ctx context.Context, cwd string) context.Context {
+func withCwd(ctx context.Context, cwd string) context.Context {
 	return context.WithValue(ctx, cwdKey, cwd)
 }
 
-// CwdFromContext returns the current working directory from context.
+// cwdFromContext returns the current working directory from context.
 // Returns "." if not set.
-func CwdFromContext(ctx context.Context) string {
+func cwdFromContext(ctx context.Context) string {
 	if cwd, ok := ctx.Value(cwdKey).(string); ok {
 		return cwd
 	}
@@ -166,7 +166,7 @@ func (t *Task) Run(ctx context.Context) error {
 		// Determine paths, defaulting to cwd if not set.
 		paths := t.paths
 		if len(paths) == 0 {
-			paths = []string{CwdFromContext(ctx)}
+			paths = []string{cwdFromContext(ctx)}
 		}
 		// Filter out paths that should be skipped.
 		var filteredPaths []string
@@ -197,7 +197,7 @@ func (t *Task) Run(ctx context.Context) error {
 		rc := &RunContext{
 			Args:    t.args,
 			Paths:   filteredPaths,
-			Cwd:     CwdFromContext(ctx),
+			Cwd:     cwdFromContext(ctx),
 			Verbose: isVerbose(ctx),
 		}
 		t.err = t.Action(ctx, rc)

@@ -117,9 +117,7 @@ func TestLintTask_PathsPassedCorrectly(t *testing.T) {
 	// Set paths via SetPaths (as PathFilter wrapper does).
 	task.SetPaths([]string{"proj1", "proj2"})
 
-	ctx := pocket.WithCwd(context.Background(), "testdir")
-
-	if err := task.Run(ctx); err != nil {
+	if err := task.Run(context.Background()); err != nil {
 		t.Fatalf("task.Run failed: %v", err)
 	}
 

@@ -253,7 +253,7 @@ func (p *PathFilter) ResolveFor(cwd string) []string {
 
 // Run executes the inner Runnable after setting resolved paths on tasks.
 func (p *PathFilter) Run(ctx context.Context) error {
-	cwd := CwdFromContext(ctx)
+	cwd := cwdFromContext(ctx)
 	paths := p.ResolveFor(cwd)
 
 	// Set paths on all tasks in the inner Runnable.

@@ -106,7 +106,7 @@ func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) 
 
 	// Set verbose mode and cwd in context.
 	ctx = withVerbose(ctx, *verbose)
-	ctx = WithCwd(ctx, cwd)
+	ctx = withCwd(ctx, cwd)
 
 	// Run the task.
 	if err := taskToRun.Run(ctx); err != nil {
