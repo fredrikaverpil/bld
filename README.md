@@ -117,71 +117,43 @@ Tools are automatically downloaded on first use and cached for subsequent runs.
 
 ### Tasks with options
 
-For reusable tasks, create functions that accept options:
+Tasks can accept options configurable both at project level and via CLI flags.
+Define a struct for your options and create a function that returns `*pocket.Task`:
 
 ```go
-type LintOptions struct {
-    ConfigFile string
-    Fix        bool
+type DeployOptions struct {
+    Env    string `usage:"target environment"`
+    DryRun bool   `usage:"print actions without executing"`
 }
 
-func LintTask(opts LintOptions) *pocket.Task {
+func DeployTask(defaults ...DeployOptions) *pocket.Task {
     return &pocket.Task{
-        Name:  "lint",
-        Usage: "run linter",
-        Action: func(ctx context.Context, _ *pocket.RunContext) error {
-            args := []string{"run"}
-            if opts.ConfigFile != "" {
-                args = append(args, "-c", opts.ConfigFile)
+        Name:    "deploy",
+        Usage:   "deploy to environment",
+        Options: pocket.FirstOrZero(defaults...),
+        Action: func(ctx context.Context, rc *pocket.RunContext) error {
+            opts := pocket.GetOptions[DeployOptions](rc)
+            if opts.DryRun {
+                pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
+                return nil
             }
-            if opts.Fix {
-                args = append(args, "--fix")
-            }
-            args = append(args, "./...")
-            return pocket.Command(ctx, "golangci-lint", args...).Run()
+            pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
+            return nil
         },
     }
 }
 
 var Config = pocket.Config{
-    Run: LintTask(LintOptions{ConfigFile: ".golangci.yml", Fix: true}),
+    Run: DeployTask(DeployOptions{Env: "staging"}),  // project defaults
 }
 ```
 
-### Tasks with options
-
-Tasks can accept options that are configurable via CLI flags. Define a struct
-for your options:
-
-```go
-type DeployOptions struct {
-    Env    string
-    DryRun bool
-}
-
-var deployTask = &pocket.Task{
-    Name:  "deploy",
-    Usage: "deploy to environment",
-    Options: DeployOptions{Env: "staging"},  // defaults
-    Action: func(ctx context.Context, rc *pocket.RunContext) error {
-        opts := pocket.GetOptions[DeployOptions](rc)
-        if opts.DryRun {
-            pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
-            return nil
-        }
-        pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
-        return nil
-    },
-}
-```
-
-CLI flags and help text are derived from field names (`DryRun` → `-dry-run`).
-Supported types: `string`, `int`, `bool`. Optional tags: `` `arg:"name"` `` to
-override flag name, `` `usage:"description"` `` for custom help text.
+CLI flags are derived from field names (`DryRun` → `-dry-run`). Supported types:
+`string`, `int`, `bool`. Use `` `usage:"description"` `` for help text.
 
 ```bash
-./pok deploy                        # uses defaults
-./pok deploy -env=prod -dry-run     # override values
+./pok deploy                        # uses project default (staging)
+./pok deploy -env=prod -dry-run     # override at runtime
 ./pok deploy -h                     # show task-specific help
 ```
 
