@@ -132,7 +132,7 @@ func DeployTask(defaults ...DeployOptions) *pocket.Task {
         Usage:   "deploy to environment",
         Options: pocket.FirstOrZero(defaults...),
         Action: func(ctx context.Context, rc *pocket.RunContext) error {
-            opts := pocket.GetOptions[DeployOptions](rc)
+            opts := pocket.GetOptions[DeployOptions](rc)  // defaults merged with CLI flags
             if opts.DryRun {
                 pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
                 return nil
@@ -210,6 +210,9 @@ var Config = pocket.Config{
     ),
 }
 ```
+
+Each package internally defines whether its tasks run in parallel or serial
+(e.g., format before lint).
 
 Task arguments can be overridden at runtime:
 
