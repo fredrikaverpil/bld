@@ -66,13 +66,13 @@ const (
 	skipKey
 )
 
-// WithVerbose returns a context with verbose mode set.
-func WithVerbose(ctx context.Context, verbose bool) context.Context {
+// withVerbose returns a context with verbose mode set.
+func withVerbose(ctx context.Context, verbose bool) context.Context {
 	return context.WithValue(ctx, verboseKey, verbose)
 }
 
-// IsVerbose returns true if verbose mode is enabled in the context.
-func IsVerbose(ctx context.Context) bool {
+// isVerbose returns true if verbose mode is enabled in the context.
+func isVerbose(ctx context.Context) bool {
 	v, _ := ctx.Value(verboseKey).(bool)
 	return v
 }
@@ -198,7 +198,7 @@ func (t *Task) Run(ctx context.Context) error {
 			Args:    t.args,
 			Paths:   filteredPaths,
 			Cwd:     CwdFromContext(ctx),
-			Verbose: IsVerbose(ctx),
+			Verbose: isVerbose(ctx),
 		}
 		t.err = t.Action(ctx, rc)
 	})

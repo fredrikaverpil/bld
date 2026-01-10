@@ -105,7 +105,7 @@ func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) 
 	defer stop()
 
 	// Set verbose mode and cwd in context.
-	ctx = WithVerbose(ctx, *verbose)
+	ctx = withVerbose(ctx, *verbose)
 	ctx = WithCwd(ctx, cwd)
 
 	// Run the task.

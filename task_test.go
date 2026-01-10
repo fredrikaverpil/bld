@@ -151,7 +151,7 @@ func TestTask_ActionReceivesVerbose(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if receivedVerbose {
-		t.Error("expected Verbose=false without WithVerbose")
+		t.Error("expected Verbose=false without withVerbose")
 	}
 
 	// Run with verbose (new task since sync.Once).
@@ -162,11 +162,11 @@ func TestTask_ActionReceivesVerbose(t *testing.T) {
 			return nil
 		},
 	}
-	ctx = WithVerbose(ctx, true)
+	ctx = withVerbose(ctx, true)
 	if err := task2.Run(ctx); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !receivedVerbose {
-		t.Error("expected Verbose=true with WithVerbose")
+		t.Error("expected Verbose=true with withVerbose")
 	}
 }
