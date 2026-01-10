@@ -21,6 +21,25 @@ pocket handle tool installation.
 - **Tool management**: Downloads and caches tools in `.pocket/`
 - **Simple invocation**: Just `./pok <task>` or `./pok -h` to list tasks
 
+### Todos
+
+- [ ] Prevent accidental use of `defaults` in a task's `Action` function; must
+      use the helper `GetOptions`.
+- [ ] It is difficult to just read the source code toady, and get a grasp on how
+      to create tasks and task groups. This README is crucial for understanding.
+      Tasks and task groups could use `New` functions that would help users with
+      creation? Would it help to create interfaces which shows what the tasks
+      and task groups must implement?
+- [ ] Categorize functions used to create tasks and task groups under one
+      package, e.g. named `pok`. It will make it easier to discover possible
+      functions etc that exist at your disposal when setting up your
+      `.pocket/config.go` for example. But also, we want it to be as straight
+      forward to discover functions etc when designing tasks and task groups.
+- [ ] Make as much parts of Pocket as possible non-exported, so we don't have to
+      worry users starts using things we cannot refactor later.
+- [ ] Move as much as possible into an internal folder, that export parts of
+      Pocket that is only intended for the internals powering Pocket.
+
 ## Quickstart
 
 ### Bootstrap
@@ -118,7 +137,8 @@ Tools are automatically downloaded on first use and cached for subsequent runs.
 ### Tasks with options
 
 Tasks can accept options configurable both at project level and via CLI flags.
-Define a struct for your options and create a function that returns `*pocket.Task`:
+Define a struct for your options and create a function that returns
+`*pocket.Task`:
 
 ```go
 type DeployOptions struct {
