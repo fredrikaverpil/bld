@@ -12,10 +12,13 @@ import (
 )
 
 func TestNew_CustomTasks(t *testing.T) {
-	customTask := &pocket.Task{
-		Name:  "my-custom-task",
-		Usage: "a custom task for testing",
-	}
+	customTask := pocket.NewTask(
+		"my-custom-task",
+		"a custom task for testing",
+		func(_ context.Context, _ *pocket.RunContext) error {
+			return nil
+		},
+	)
 
 	cfg := pocket.Config{
 		Run: customTask,
@@ -35,8 +38,16 @@ func TestNew_CustomTasks(t *testing.T) {
 func TestNew_MultipleCustomTasks(t *testing.T) {
 	cfg := pocket.Config{
 		Run: pocket.Serial(
-			&pocket.Task{Name: "deploy", Usage: "deploy the app"},
-			&pocket.Task{Name: "release", Usage: "create a release"},
+			pocket.NewTask(
+				"deploy",
+				"deploy the app",
+				func(_ context.Context, _ *pocket.RunContext) error { return nil },
+			),
+			pocket.NewTask(
+				"release",
+				"create a release",
+				func(_ context.Context, _ *pocket.RunContext) error { return nil },
+			),
 		),
 	}
 
@@ -126,7 +137,7 @@ func TestAllTasks_ReturnsAllTasks(t *testing.T) {
 	cfg := pocket.Config{
 		Run: pocket.Serial(
 			golang.Tasks(),
-			&pocket.Task{Name: "custom", Usage: "custom task"},
+			pocket.NewTask("custom", "custom task", func(_ context.Context, _ *pocket.RunContext) error { return nil }),
 		),
 	}
 
@@ -159,20 +170,14 @@ func TestAllTasks_ReturnsAllTasks(t *testing.T) {
 
 func TestParallel_Execution(t *testing.T) {
 	var count atomic.Int32
-	task1 := &pocket.Task{
-		Name: "task1",
-		Action: func(_ context.Context, _ *pocket.RunContext) error {
-			count.Add(1)
-			return nil
-		},
-	}
-	task2 := &pocket.Task{
-		Name: "task2",
-		Action: func(_ context.Context, _ *pocket.RunContext) error {
-			count.Add(1)
-			return nil
-		},
-	}
+	task1 := pocket.NewTask("task1", "task 1", func(_ context.Context, _ *pocket.RunContext) error {
+		count.Add(1)
+		return nil
+	})
+	task2 := pocket.NewTask("task2", "task 2", func(_ context.Context, _ *pocket.RunContext) error {
+		count.Add(1)
+		return nil
+	})
 
 	err := pocket.Parallel(task1, task2).Run(context.Background())
 	if err != nil {
@@ -186,20 +191,14 @@ func TestParallel_Execution(t *testing.T) {
 
 func TestSerial_Execution(t *testing.T) {
 	var order []string
-	task1 := &pocket.Task{
-		Name: "task1",
-		Action: func(_ context.Context, _ *pocket.RunContext) error {
-			order = append(order, "task1")
-			return nil
-		},
-	}
-	task2 := &pocket.Task{
-		Name: "task2",
-		Action: func(_ context.Context, _ *pocket.RunContext) error {
-			order = append(order, "task2")
-			return nil
-		},
-	}
+	task1 := pocket.NewTask("task1", "task 1", func(_ context.Context, _ *pocket.RunContext) error {
+		order = append(order, "task1")
+		return nil
+	})
+	task2 := pocket.NewTask("task2", "task 2", func(_ context.Context, _ *pocket.RunContext) error {
+		order = append(order, "task2")
+		return nil
+	})
 
 	err := pocket.Serial(task1, task2).Run(context.Background())
 	if err != nil {
@@ -213,13 +212,10 @@ func TestSerial_Execution(t *testing.T) {
 
 func TestTask_RunsOnlyOnce(t *testing.T) {
 	runCount := 0
-	task := &pocket.Task{
-		Name: "once",
-		Action: func(_ context.Context, _ *pocket.RunContext) error {
-			runCount++
-			return nil
-		},
-	}
+	task := pocket.NewTask("once", "run once", func(_ context.Context, _ *pocket.RunContext) error {
+		runCount++
+		return nil
+	})
 
 	ctx := context.Background()
 	_ = task.Run(ctx)

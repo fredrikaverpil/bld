@@ -23,17 +23,20 @@ var Config = pocket.Config{
 
 // GreetOptions defines the options for the greet task.
 type GreetOptions struct {
-	Name string
+	Name string `usage:"name to greet"`
 }
 
-// greetTask demonstrates task arguments.
-var greetTask = &pocket.Task{
-	Name:  "greet",
-	Usage: "print a greeting message",
-	Options: GreetOptions{Name: "world"},
-	Action: func(ctx context.Context, rc *pocket.RunContext) error {
-		args := pocket.GetOptions[GreetOptions](rc)
-		pocket.Printf(ctx, "Hello, %s!\n", args.Name)
-		return nil
-	},
+// greetAction is the action for the greet task.
+func greetAction(ctx context.Context, rc *pocket.RunContext) error {
+	opts := pocket.GetOptions[GreetOptions](rc)
+	name := opts.Name
+	if name == "" {
+		name = "world"
+	}
+	pocket.Printf(ctx, "Hello, %s!\n", name)
+	return nil
 }
+
+// greetTask demonstrates the new task pattern.
+var greetTask = pocket.NewTask("greet", "print a greeting message", greetAction).
+	WithOptions(GreetOptions{Name: "world"})

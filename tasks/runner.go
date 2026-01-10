@@ -59,30 +59,25 @@ func NewRunner(cfg pocket.Config) *Runner {
 
 	// Create the "all" task that runs everything.
 	// Hidden because it's the default task (run when no task is specified).
-	t.All = &pocket.Task{
-		Name:   "all",
-		Usage:  "run all tasks",
-		Hidden: true,
-		Action: func(ctx context.Context, _ *pocket.RunContext) error {
-			// Generate first.
-			if err := t.Generate.Run(ctx); err != nil {
+	t.All = pocket.NewTask("all", "run all tasks", func(ctx context.Context, _ *pocket.RunContext) error {
+		// Generate first.
+		if err := t.Generate.Run(ctx); err != nil {
+			return err
+		}
+
+		// Run the user's execution tree.
+		if cfg.Run != nil {
+			if err := cfg.Run.Run(ctx); err != nil {
 				return err
 			}
+		}
 
-			// Run the user's execution tree.
-			if cfg.Run != nil {
-				if err := cfg.Run.Run(ctx); err != nil {
-					return err
-				}
-			}
-
-			// Git diff at the end (if not skipped).
-			if !cfg.SkipGitDiff {
-				return t.GitDiff.Run(ctx)
-			}
-			return nil
-		},
-	}
+		// Git diff at the end (if not skipped).
+		if !cfg.SkipGitDiff {
+			return t.GitDiff.Run(ctx)
+		}
+		return nil
+	}).AsHidden()
 
 	return t
 }

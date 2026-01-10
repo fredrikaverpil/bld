@@ -105,14 +105,10 @@ func TestLintTask_PathsPassedCorrectly(t *testing.T) {
 	// Create a custom task to capture what paths would be passed.
 	var capturedPaths []string
 
-	task := &pocket.Task{
-		Name:  "test-capture",
-		Usage: "capture paths for testing",
-		Action: func(_ context.Context, opts *pocket.RunContext) error {
-			capturedPaths = opts.Paths
-			return nil
-		},
-	}
+	task := pocket.NewTask("test-capture", "capture paths for testing", func(_ context.Context, opts *pocket.RunContext) error {
+		capturedPaths = opts.Paths
+		return nil
+	})
 
 	// Set paths via SetPaths (as PathFilter wrapper does).
 	task.SetPaths([]string{"proj1", "proj2"})

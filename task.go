@@ -34,7 +34,15 @@ func (rc *RunContext) ForEachPath(fn func(dir string) error) error {
 }
 
 // Task represents a runnable task.
+//
+// Create tasks using NewTask:
+//
+//	pocket.NewTask("my-task", "description", func(ctx context.Context, rc *pocket.RunContext) error {
+//	    return nil
+//	}).WithOptions(MyOptions{})
 type Task struct {
+	// Public fields (for backwards compatibility during migration)
+	// Deprecated: Use NewTask() constructor instead of struct literals.
 	Name    string
 	Usage   string
 	Options TaskOptions // typed options struct for CLI parsing (see args.go)
@@ -50,6 +58,71 @@ type Task struct {
 	cliArgs map[string]string
 	// paths stores the resolved paths for this execution.
 	paths []string
+}
+
+// NewTask creates a task with the required fields.
+// Name is the CLI command name (e.g., "go-format").
+// Usage is the help text shown in CLI.
+// Action is the function executed when the task runs.
+//
+// Example:
+//
+//	pocket.NewTask("deploy", "deploy to environment", func(ctx context.Context, rc *pocket.RunContext) error {
+//	    opts := pocket.GetOptions[DeployOptions](rc)
+//	    return deploy(opts.Env)
+//	}).WithOptions(DeployOptions{Env: "staging"})
+func NewTask(name, usage string, action TaskAction) *Task {
+	if name == "" {
+		panic("pocket.NewTask: name is required")
+	}
+	if usage == "" {
+		panic("pocket.NewTask: usage is required")
+	}
+	if action == nil {
+		panic("pocket.NewTask: action is required")
+	}
+	return &Task{
+		Name:   name,
+		Usage:  usage,
+		Action: action,
+	}
+}
+
+// WithOptions sets typed options for CLI flag parsing.
+// Options must be a struct with exported fields of type bool, string, or int.
+// Use struct tags to customize: `usage:"help text"` and `arg:"flag-name"`.
+//
+// Example:
+//
+//	type DeployOptions struct {
+//	    Env    string `usage:"target environment"`
+//	    DryRun bool   `usage:"print without executing"`
+//	}
+//
+//	NewTask("deploy", "deploy app", deployAction).
+//	    WithOptions(DeployOptions{Env: "staging"})
+func (t *Task) WithOptions(opts any) *Task {
+	if opts != nil {
+		if _, err := inspectArgs(opts); err != nil {
+			panic(fmt.Sprintf("pocket.Task.WithOptions: %v", err))
+		}
+	}
+	t.Options = opts
+	return t
+}
+
+// AsHidden marks the task as hidden from CLI help output.
+// Hidden tasks can still be run directly by name.
+func (t *Task) AsHidden() *Task {
+	t.Hidden = true
+	return t
+}
+
+// AsBuiltin marks the task as a built-in task.
+// This is used internally for core tasks like generate, update, git-diff.
+func (t *Task) AsBuiltin() *Task {
+	t.Builtin = true
+	return t
 }
 
 // contextKey is the type for context keys used by this package.

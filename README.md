@@ -23,13 +23,13 @@ pocket handle tool installation.
 
 ### Todos
 
-- [ ] Prevent accidental use of `defaults` in a task's `Action` function; must
-      use the helper `GetOptions`.
-- [ ] It is difficult to just read the source code toady, and get a grasp on how
-      to create tasks and task groups. This README is crucial for understanding.
-      Tasks and task groups could use `New` functions that would help users with
-      creation? Would it help to create interfaces which shows what the tasks
-      and task groups must implement?
+- [x] Prevent accidental use of `defaults` in a task's `Action` function; must
+      use the helper `GetOptions`. (Solved by separating action functions from
+      task constructors - no closure capture possible.)
+- [x] It is difficult to just read the source code today, and get a grasp on how
+      to create tasks and task groups. Tasks and task groups could use `New`
+      functions that would help users with creation? (Solved with `NewTask()`
+      constructor and chainable methods.)
 - [ ] Categorize functions used to create tasks and task groups under one
       package, e.g. named `pok`. It will make it easier to discover possible
       functions etc that exist at your disposal when setting up your
@@ -69,14 +69,14 @@ var Config = pocket.Config{
     Run: helloTask,
 }
 
-var helloTask = &pocket.Task{
-    Name:  "hello",
-    Usage: "say hello",
-    Action: func(ctx context.Context, opts *pocket.RunContext) error {
-        pocket.Println(ctx, "Hello from pocket!")
-        return nil
-    },
+// helloAction is defined separately from the task constructor.
+func helloAction(ctx context.Context, rc *pocket.RunContext) error {
+    pocket.Println(ctx, "Hello from pocket!")
+    return nil
 }
+
+// helloTask uses NewTask to create a task with required fields.
+var helloTask = pocket.NewTask("hello", "say hello", helloAction)
 ```
 
 ```bash
@@ -121,13 +121,11 @@ rely on CI to install them. Here's a task that uses golangci-lint:
 ```go
 import "github.com/fredrikaverpil/pocket/tools/golangcilint"
 
-var lintTask = &pocket.Task{
-    Name:  "lint",
-    Usage: "run linter",
-    Action: func(ctx context.Context, opts *pocket.RunContext) error {
-        return golangcilint.Run(ctx, "run", "./...")
-    },
+func lintAction(ctx context.Context, rc *pocket.RunContext) error {
+    return golangcilint.Run(ctx, "run", "./...")
 }
+
+var lintTask = pocket.NewTask("lint", "run linter", lintAction)
 ```
 
 Tools are automatically downloaded on first use and cached for subsequent runs.
@@ -137,34 +135,33 @@ Tools are automatically downloaded on first use and cached for subsequent runs.
 ### Tasks with options
 
 Tasks can accept options configurable both at project level and via CLI flags.
-Define a struct for your options and create a function that returns
-`*pocket.Task`:
+Define a struct for your options and use `WithOptions()`:
 
 ```go
+// DeployOptions configures the deploy task.
 type DeployOptions struct {
     Env    string `usage:"target environment"`
     DryRun bool   `usage:"print actions without executing"`
 }
 
-func DeployTask(defaults ...DeployOptions) *pocket.Task {
-    return &pocket.Task{
-        Name:    "deploy",
-        Usage:   "deploy to environment",
-        Options: pocket.FirstOrZero(defaults...),
-        Action: func(ctx context.Context, rc *pocket.RunContext) error {
-            opts := pocket.GetOptions[DeployOptions](rc)  // defaults merged with CLI flags
-            if opts.DryRun {
-                pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
-                return nil
-            }
-            pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
-            return nil
-        },
+// deployAction is the task implementation.
+func deployAction(ctx context.Context, rc *pocket.RunContext) error {
+    opts := pocket.GetOptions[DeployOptions](rc)  // defaults merged with CLI flags
+    if opts.DryRun {
+        pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
+        return nil
     }
+    pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
+    return nil
+}
+
+// DeployTask returns a task that deploys to an environment.
+func DeployTask() *pocket.Task {
+    return pocket.NewTask("deploy", "deploy to environment", deployAction)
 }
 
 var Config = pocket.Config{
-    Run: DeployTask(DeployOptions{Env: "staging"}),  // project defaults
+    Run: DeployTask().WithOptions(DeployOptions{Env: "staging"}),  // project defaults
 }
 ```
 
@@ -241,14 +238,30 @@ Task arguments can be overridden at runtime:
 ./pok go-lint -lint-config=.golangci.yml
 ```
 
-Or set project-level defaults by constructing individual tasks:
+Or set project-level defaults using functional options:
 
 ```go
 var Config = pocket.Config{
     Run: pocket.Serial(
-        golang.FormatTask(),
-        golang.LintTask(golang.LintArgs{LintConfig: ".golangci.yml"}),
-        golang.TestTask(golang.TestArgs{SkipRace: true}),
+        golang.Tasks(
+            golang.WithFormat(golang.FormatOptions{LintConfig: ".golangci.yml"}),
+            golang.WithTest(golang.TestOptions{SkipRace: true}),
+        ),
+        python.Tasks(
+            python.WithFormat(python.FormatOptions{RuffConfig: "ruff.toml"}),
+        ),
+    ),
+}
+```
+
+Or construct individual tasks with options:
+
+```go
+var Config = pocket.Config{
+    Run: pocket.Serial(
+        golang.FormatTask().WithOptions(golang.FormatOptions{LintConfig: ".golangci.yml"}),
+        golang.LintTask(),
+        golang.TestTask().WithOptions(golang.TestOptions{SkipRace: true}),
     ),
 }
 ```
@@ -306,6 +319,38 @@ pocket.AutoDetect(golang.Tasks()).Skip(golang.TestTask()).Skip(golang.VulncheckT
 
 ## Reference
 
+### Task creation
+
+```go
+// Create a task with required fields (name, usage, action)
+task := pocket.NewTask("my-task", "description", myAction)
+
+// Add optional configuration via chaining
+task.WithOptions(MyOptions{})  // CLI-configurable options
+task.AsHidden()                // hide from CLI help
+task.AsBuiltin()               // mark as built-in task
+```
+
+### Task group creation
+
+```go
+// Create a task group (runs tasks in parallel by default)
+group := pocket.NewTaskGroup(formatTask, lintTask, testTask)
+
+// Configure execution order
+group.RunWith(func(ctx context.Context) error {
+    if err := pocket.Serial(formatTask, lintTask).Run(ctx); err != nil {
+        return err
+    }
+    return testTask.Run(ctx)
+})
+
+// Configure auto-detection
+group.DetectByFile("go.mod")           // detect by marker files
+group.DetectByExtension(".py")         // detect by file extensions
+group.DetectBy(func() []string { ... }) // custom detection
+```
+
 ### Convenience functions
 
 ```go
@@ -329,6 +374,9 @@ cmd.Run()
 // Detection (for Detectable interface)
 pocket.DetectByFile("go.mod")       // dirs containing file
 pocket.DetectByExtension(".lua")    // dirs containing extension
+
+// Options
+opts := pocket.GetOptions[MyOptions](rc)  // retrieve typed options in action
 ```
 
 > [!NOTE]

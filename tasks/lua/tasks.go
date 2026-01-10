@@ -9,17 +9,85 @@ import (
 	"github.com/fredrikaverpil/pocket/tools/stylua"
 )
 
+// TasksOption configures the lua task group.
+type TasksOption func(*tasksConfig)
+
+type tasksConfig struct {
+	format FormatOptions
+}
+
+// WithFormat sets options for the lua-format task.
+func WithFormat(opts FormatOptions) TasksOption {
+	return func(c *tasksConfig) { c.format = opts }
+}
+
 // Tasks returns a Runnable that executes all Lua tasks.
 // Runs from repository root since Lua files are typically scattered.
 // Use pocket.AutoDetect(lua.Tasks()) to enable path filtering.
-func Tasks() pocket.Runnable {
-	return pocket.NewTaskGroup(FormatTask()).
+//
+// Example with options:
+//
+//	pocket.AutoDetect(lua.Tasks(
+//	    lua.WithFormat(lua.FormatOptions{StyluaConfig: ".stylua.toml"}),
+//	))
+func Tasks(opts ...TasksOption) pocket.Runnable {
+	var cfg tasksConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	format := FormatTask().WithOptions(cfg.format)
+
+	return pocket.NewTaskGroup(format).
 		DetectBy(func() []string { return []string{"."} })
 }
 
 // FormatOptions configures the lua-format task.
 type FormatOptions struct {
 	StyluaConfig string `usage:"path to stylua config file"`
+}
+
+// FormatTask returns a task that formats Lua files using stylua.
+// Use WithOptions to set project-level configuration.
+func FormatTask() *pocket.Task {
+	return pocket.NewTask("lua-format", "format Lua files", formatAction)
+}
+
+// formatAction is the action for the lua-format task.
+func formatAction(ctx context.Context, rc *pocket.RunContext) error {
+	opts := pocket.GetOptions[FormatOptions](rc)
+	configPath := opts.StyluaConfig
+	if configPath == "" {
+		var err error
+		configPath, err = stylua.ConfigPath()
+		if err != nil {
+			return fmt.Errorf("get stylua config: %w", err)
+		}
+	}
+	return rc.ForEachPath(func(dir string) error {
+		absDir := pocket.FromGitRoot(dir)
+
+		needsFormat, checkOutput, err := formatCheck(ctx, configPath, absDir)
+		if err != nil {
+			return err
+		}
+		if !needsFormat {
+			pocket.Println(ctx, "No files in need of formatting.")
+			return nil
+		}
+
+		// Show diff in verbose mode.
+		if rc.Verbose && len(checkOutput) > 0 {
+			pocket.Printf(ctx, "%s", checkOutput)
+		}
+
+		// Now actually format.
+		if err := stylua.Run(ctx, "-f", configPath, absDir); err != nil {
+			return fmt.Errorf("stylua format failed in %s: %w", dir, err)
+		}
+		pocket.Println(ctx, "Formatted files.")
+		return nil
+	})
 }
 
 // formatCheck runs stylua --check to see if formatting is needed.
@@ -33,49 +101,4 @@ func formatCheck(ctx context.Context, configPath, dir string) (needsFormat bool,
 	cmd.Stderr = nil
 	output, checkErr := cmd.CombinedOutput()
 	return checkErr != nil, output, nil
-}
-
-// FormatTask returns a task that formats Lua files using stylua.
-// Optional defaults can be passed to set project-level configuration.
-func FormatTask(defaults ...FormatOptions) *pocket.Task {
-	return &pocket.Task{
-		Name:    "lua-format",
-		Usage:   "format Lua files",
-		Options: pocket.FirstOrZero(defaults...),
-		Action: func(ctx context.Context, rc *pocket.RunContext) error {
-			opts := pocket.GetOptions[FormatOptions](rc)
-			configPath := opts.StyluaConfig
-			if configPath == "" {
-				var err error
-				configPath, err = stylua.ConfigPath()
-				if err != nil {
-					return fmt.Errorf("get stylua config: %w", err)
-				}
-			}
-			return rc.ForEachPath(func(dir string) error {
-				absDir := pocket.FromGitRoot(dir)
-
-				needsFormat, checkOutput, err := formatCheck(ctx, configPath, absDir)
-				if err != nil {
-					return err
-				}
-				if !needsFormat {
-					pocket.Println(ctx, "No files in need of formatting.")
-					return nil
-				}
-
-				// Show diff in verbose mode.
-				if rc.Verbose && len(checkOutput) > 0 {
-					pocket.Printf(ctx, "%s", checkOutput)
-				}
-
-				// Now actually format.
-				if err := stylua.Run(ctx, "-f", configPath, absDir); err != nil {
-					return fmt.Errorf("stylua format failed in %s: %w", dir, err)
-				}
-				pocket.Println(ctx, "Formatted files.")
-				return nil
-			})
-		},
-	}
 }
