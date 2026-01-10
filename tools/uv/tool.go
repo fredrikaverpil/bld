@@ -14,7 +14,7 @@ import (
 const name = "uv"
 
 // renovate: datasource=github-releases depName=astral-sh/uv
-const version = "0.7.13"
+const version = "0.9.24"
 
 var t = &tool.Tool{Name: name, Prepare: Prepare}
 
