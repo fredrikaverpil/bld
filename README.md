@@ -30,7 +30,7 @@ pocket handle tool installation.
       to create tasks and task groups. Tasks and task groups could use `New`
       functions that would help users with creation? (Solved with `NewTask()`
       constructor and chainable methods.)
-- [ ] `./pok clean`; to clean `./pocket/tools`, `./pocket/bin`
+- [x] `./pok clean`; to clean `./pocket/tools`, `./pocket/bin`
 - [ ] Ability to define tasks which run on ./pok and tasks which must be run
       only explicitly with `./pok <taskname>`. Such "explicit tasks" should
       appear in their own section in `./pok -h`. Default behavior is to not

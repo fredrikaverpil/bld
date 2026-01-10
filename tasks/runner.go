@@ -6,17 +6,21 @@ import (
 	"context"
 
 	"github.com/fredrikaverpil/pocket"
+	"github.com/fredrikaverpil/pocket/tasks/clean"
 	"github.com/fredrikaverpil/pocket/tasks/generate"
 	"github.com/fredrikaverpil/pocket/tasks/gitdiff"
 	"github.com/fredrikaverpil/pocket/tasks/update"
 )
 
 // Runner holds all registered tasks based on the Config.
-// It orchestrates built-in tasks (all, generate, update, git-diff)
+// It orchestrates built-in tasks (all, generate, update, git-diff, clean)
 // and collects user tasks for CLI registration.
 type Runner struct {
 	// All runs all configured tasks.
 	All *pocket.Task
+
+	// Clean removes downloaded tools and binaries.
+	Clean *pocket.Task
 
 	// Generate regenerates all generated files.
 	Generate *pocket.Task
@@ -38,6 +42,9 @@ type Runner struct {
 func NewRunner(cfg pocket.Config) *Runner {
 	cfg = cfg.WithDefaults()
 	t := &Runner{}
+
+	// Clean is available as a standalone task.
+	t.Clean = clean.Task()
 
 	// Generate runs first - other tasks may need generated files.
 	t.Generate = generate.Task(cfg)
@@ -85,7 +92,7 @@ func NewRunner(cfg pocket.Config) *Runner {
 // AllTasks returns all tasks including the "all" task.
 // This is used by the CLI to register all available tasks.
 func (t *Runner) AllTasks() []*pocket.Task {
-	tasks := []*pocket.Task{t.All, t.Generate, t.Update, t.GitDiff}
+	tasks := []*pocket.Task{t.All, t.Clean, t.Generate, t.Update, t.GitDiff}
 	tasks = append(tasks, t.UserTasks...)
 	return tasks
 }
