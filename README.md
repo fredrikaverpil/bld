@@ -26,9 +26,9 @@ pocket handle tool installation.
 ### Todos
 
 - [ ] Make as much parts of Pocket as possible non-exported, so we don't have to
-  worry users starts using things we cannot refactor later.
+      worry users starts using things we cannot refactor later.
   - [ ] Move as much as possible into an internal folder, that export parts of
-    Pocket that is only intended for the internals powering Pocket.
+        Pocket that is only intended for the internals powering Pocket.
 
 ## Quickstart
 
@@ -76,7 +76,7 @@ var helloTask = pocket.NewTask("hello", "say hello", helloAction)
 ./pok         # run auto-run tasks
 ```
 
-> [!TIP]
+> [!NOTE]
 >
 > Use `ManualRun` for tasks that should only run when explicitly called (like
 > `deploy`). See [Auto-run vs manual tasks](#auto-run-vs-manual-tasks).
