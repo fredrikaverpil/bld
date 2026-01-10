@@ -104,9 +104,11 @@ func run(tasks []*Task, defaultTask *Task, pathMappings map[string]*PathFilter) 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Set verbose mode and cwd in context.
-	ctx = withVerbose(ctx, *verbose)
-	ctx = withCwd(ctx, cwd)
+	// Set run configuration in context.
+	ctx = withRunConfig(ctx, &runConfig{
+		verbose: *verbose,
+		cwd:     cwd,
+	})
 
 	// Run the task.
 	if err := taskToRun.Run(ctx); err != nil {
