@@ -2,20 +2,32 @@ package pocket
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
 	"sync"
 )
 
-// outputKey is the context key for output writers.
-const outputKey contextKey = 100
+// Output holds stdout and stderr writers for task output.
+// This is passed through the Runnable chain to direct output appropriately.
+type Output struct {
+	Stdout io.Writer
+	Stderr io.Writer
+}
 
-// output holds stdout and stderr writers for a task.
-type output struct {
-	stdout io.Writer
-	stderr io.Writer
+// StdOutput returns an Output that writes to os.Stdout and os.Stderr.
+func StdOutput() *Output {
+	return &Output{Stdout: os.Stdout, Stderr: os.Stderr}
+}
+
+// Printf formats and prints to stdout.
+func (o *Output) Printf(format string, a ...any) (int, error) {
+	return fmt.Fprintf(o.Stdout, format, a...)
+}
+
+// Println prints to stdout with a newline.
+func (o *Output) Println(a ...any) (int, error) {
+	return fmt.Fprintln(o.Stdout, a...)
 }
 
 // bufferedOutput captures output to buffers for later printing.
@@ -43,6 +55,14 @@ func (b *bufferedOutput) Flush() {
 	_, _ = io.Copy(os.Stderr, &b.stderr)
 }
 
+// Output returns an Output that writes to the buffers.
+func (b *bufferedOutput) Output() *Output {
+	return &Output{
+		Stdout: b.Stdout(),
+		Stderr: b.Stderr(),
+	}
+}
+
 // lockedWriter wraps a writer with a mutex for safe concurrent writes.
 type lockedWriter struct {
 	mu *sync.Mutex
@@ -53,37 +73,4 @@ func (l *lockedWriter) Write(p []byte) (n int, err error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.w.Write(p)
-}
-
-// withOutput returns a context with the given output writers.
-func withOutput(ctx context.Context, stdout, stderr io.Writer) context.Context {
-	return context.WithValue(ctx, outputKey, &output{stdout: stdout, stderr: stderr})
-}
-
-// Stdout returns the stdout writer from context, or os.Stdout if not set.
-func Stdout(ctx context.Context) io.Writer {
-	if o, ok := ctx.Value(outputKey).(*output); ok {
-		return o.stdout
-	}
-	return os.Stdout
-}
-
-// Stderr returns the stderr writer from context, or os.Stderr if not set.
-func Stderr(ctx context.Context) io.Writer {
-	if o, ok := ctx.Value(outputKey).(*output); ok {
-		return o.stderr
-	}
-	return os.Stderr
-}
-
-// Printf formats and prints to stdout from context.
-// Use this in task actions instead of fmt.Printf for proper output handling.
-func Printf(ctx context.Context, format string, a ...any) (int, error) {
-	return fmt.Fprintf(Stdout(ctx), format, a...)
-}
-
-// Println prints to stdout from context with a newline.
-// Use this in task actions instead of fmt.Println for proper output handling.
-func Println(ctx context.Context, a ...any) (int, error) {
-	return fmt.Fprintln(Stdout(ctx), a...)
 }

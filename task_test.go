@@ -18,14 +18,14 @@ func TestTask_TypedArgs_Defaults(t *testing.T) {
 	task := &Task{
 		Name:    "test-task",
 		Options: TestOptions{Name: "world", Count: 10, Debug: false},
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			received = GetOptions[TestOptions](rc)
 			return nil
 		},
 	}
 
 	// Run without any CLI args - should get defaults.
-	if err := task.Run(context.Background()); err != nil {
+	if err := task.Run(context.Background(), StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -46,7 +46,7 @@ func TestTask_TypedArgs_CLIOverride(t *testing.T) {
 	task := &Task{
 		Name:    "test-task",
 		Options: TestOptions{Name: "world", Count: 10, Debug: false},
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			received = GetOptions[TestOptions](rc)
 			return nil
 		},
@@ -59,7 +59,7 @@ func TestTask_TypedArgs_CLIOverride(t *testing.T) {
 		"debug": "true",
 	})
 
-	if err := task.Run(context.Background()); err != nil {
+	if err := task.Run(context.Background(), StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestTask_TypedArgs_PartialOverride(t *testing.T) {
 	task := &Task{
 		Name:    "test-task",
 		Options: TestOptions{Name: "world", Count: 10, Debug: false},
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			received = GetOptions[TestOptions](rc)
 			return nil
 		},
@@ -91,7 +91,7 @@ func TestTask_TypedArgs_PartialOverride(t *testing.T) {
 		"name": "partial",
 	})
 
-	if err := task.Run(context.Background()); err != nil {
+	if err := task.Run(context.Background(), StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -109,7 +109,7 @@ func TestTask_NoArgs(t *testing.T) {
 	task := &Task{
 		Name: "test-task",
 		// No Args field set
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			ran = true
 			// GetArgs on nil should return zero value.
 			args := GetOptions[TestOptions](rc)
@@ -120,7 +120,7 @@ func TestTask_NoArgs(t *testing.T) {
 		},
 	}
 
-	if err := task.Run(context.Background()); err != nil {
+	if err := task.Run(context.Background(), StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !ran {
@@ -133,7 +133,7 @@ func TestTask_ActionReceivesVerbose(t *testing.T) {
 
 	task := &Task{
 		Name: "test-task",
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			receivedVerbose = rc.Verbose
 			return nil
 		},
@@ -141,7 +141,7 @@ func TestTask_ActionReceivesVerbose(t *testing.T) {
 
 	// Run without verbose.
 	ctx := context.Background()
-	if err := task.Run(ctx); err != nil {
+	if err := task.Run(ctx, StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if receivedVerbose {
@@ -151,13 +151,13 @@ func TestTask_ActionReceivesVerbose(t *testing.T) {
 	// Run with verbose (new task since sync.Once).
 	task2 := &Task{
 		Name: "test-task-verbose",
-		Action: func(rc *RunContext) error {
+		Action: func(_ context.Context, rc *RunContext) error {
 			receivedVerbose = rc.Verbose
 			return nil
 		},
 	}
 	ctx = withRunContext(ctx, &RunContext{Verbose: true, cwd: "."})
-	if err := task2.Run(ctx); err != nil {
+	if err := task2.Run(ctx, StdOutput()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !receivedVerbose {

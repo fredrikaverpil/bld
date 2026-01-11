@@ -1,6 +1,7 @@
 package pocket
 
 import (
+	"context"
 	"testing"
 )
 
@@ -58,14 +59,14 @@ func TestSerial_Tasks(t *testing.T) {
 	task1 := &Task{
 		Name:  "test-format",
 		Usage: "format test files",
-		Action: func(_ *RunContext) error {
+		Action: func(_ context.Context, _ *RunContext) error {
 			return nil
 		},
 	}
 	task2 := &Task{
 		Name:  "test-lint",
 		Usage: "lint test files",
-		Action: func(_ *RunContext) error {
+		Action: func(_ context.Context, _ *RunContext) error {
 			return nil
 		},
 	}

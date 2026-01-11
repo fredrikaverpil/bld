@@ -9,38 +9,30 @@ import (
 )
 
 // TaskAction is the function signature for task actions.
-// Actions receive RunContext (which provides context via rc.Context()) and return an error if the task fails.
-type TaskAction func(rc *RunContext) error
+// ctx carries cancellation signals and deadlines.
+// rc provides task-specific data: paths, options, output writers.
+type TaskAction func(ctx context.Context, rc *RunContext) error
 
 // RunContext provides runtime context to Actions.
 type RunContext struct {
 	Paths   []string // resolved paths for this task (from Paths wrapper)
 	Verbose bool     // verbose mode enabled
+	Out     *Output  // output writers for stdout/stderr
 
-	ctx           context.Context // internal: cancellation signals and output writers
-	cwd           string          // internal: where CLI was invoked (relative to git root)
-	parsedOptions any             // typed options, access via GetOptions[T](rc)
-	skipRules     []skipRule      // internal: task skip rules
-}
-
-// Context returns the context for this task execution.
-// Use this to check for cancellation or pass to sub-operations.
-func (rc *RunContext) Context() context.Context {
-	if rc.ctx == nil {
-		return context.Background()
-	}
-	return rc.ctx
+	cwd           string     // internal: where CLI was invoked (relative to git root)
+	parsedOptions any        // typed options, access via GetOptions[T](rc)
+	skipRules     []skipRule // internal: task skip rules
 }
 
 // ForEachPath executes fn for each path in the context.
 // This is a convenience helper for the common pattern of iterating over paths.
 // Iteration stops early if the context is cancelled (e.g., another parallel task failed).
-func (rc *RunContext) ForEachPath(fn func(dir string) error) error {
+func (rc *RunContext) ForEachPath(ctx context.Context, fn func(dir string) error) error {
 	for _, dir := range rc.Paths {
 		// Check for cancellation before each iteration.
 		select {
-		case <-rc.Context().Done():
-			return rc.Context().Err()
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
 		}
 		if err := fn(dir); err != nil {
@@ -54,7 +46,7 @@ func (rc *RunContext) ForEachPath(fn func(dir string) error) error {
 //
 // Create tasks using NewTask:
 //
-//	pocket.NewTask("my-task", "description", func(rc *pocket.RunContext) error {
+//	pocket.NewTask("my-task", "description", func(ctx context.Context, rc *pocket.RunContext) error {
 //	    return nil
 //	}).WithOptions(MyOptions{})
 type Task struct {
@@ -90,9 +82,9 @@ func (t *Task) TaskName() string {
 //
 // Example:
 //
-//	pocket.NewTask("deploy", "deploy to environment", func(rc *pocket.RunContext) error {
+//	pocket.NewTask("deploy", "deploy to environment", func(ctx context.Context, rc *pocket.RunContext) error {
 //	    opts := pocket.GetOptions[DeployOptions](rc)
-//	    return deploy(opts.Env)
+//	    return deploy(ctx, opts.Env)
 //	}).WithOptions(DeployOptions{Env: "staging"})
 func NewTask(name, usage string, action TaskAction) *Task {
 	if name == "" {
@@ -215,7 +207,7 @@ func (t *Task) SetPaths(paths []string) {
 // Skip rules from context are checked:
 // - Global skip (no paths): task doesn't run at all
 // - Path-specific skip: those paths are filtered from execution.
-func (t *Task) Run(ctx context.Context) error {
+func (t *Task) Run(ctx context.Context, out *Output) error {
 	// Check for global skip (rule with no paths).
 	if isSkipped(ctx, t.Name, "") {
 		return nil
@@ -242,14 +234,14 @@ func (t *Task) Run(ctx context.Context) error {
 		}
 		// If all paths are skipped, don't run.
 		if len(filteredPaths) == 0 {
-			fmt.Fprintf(Stdout(ctx), "=== %s (skipped)\n", t.Name)
+			fmt.Fprintf(out.Stdout, "=== %s (skipped)\n", t.Name)
 			return
 		}
 		// Show task name with any skipped paths.
 		if len(skippedPaths) > 0 {
-			fmt.Fprintf(Stdout(ctx), "=== %s (skipped in: %s)\n", t.Name, strings.Join(skippedPaths, ", "))
+			fmt.Fprintf(out.Stdout, "=== %s (skipped in: %s)\n", t.Name, strings.Join(skippedPaths, ", "))
 		} else {
-			fmt.Fprintf(Stdout(ctx), "=== %s\n", t.Name)
+			fmt.Fprintf(out.Stdout, "=== %s\n", t.Name)
 		}
 		// Parse typed options (merge defaults from t.Options with CLI overrides).
 		parsedOptions, err := parseOptionsFromCLI(t.Options, t.cliArgs)
@@ -261,11 +253,11 @@ func (t *Task) Run(ctx context.Context) error {
 		rc := &RunContext{
 			Paths:         filteredPaths,
 			Verbose:       base.Verbose,
-			ctx:           ctx,
+			Out:           out,
 			cwd:           base.cwd,
 			parsedOptions: parsedOptions,
 		}
-		t.err = t.Action(rc)
+		t.err = t.Action(ctx, rc)
 	})
 	return t.err
 }

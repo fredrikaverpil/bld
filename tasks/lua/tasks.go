@@ -54,8 +54,7 @@ func FormatTask() *pocket.Task {
 }
 
 // formatAction is the action for the lua-format task.
-func formatAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
+func formatAction(ctx context.Context, rc *pocket.RunContext) error {
 	opts := pocket.GetOptions[FormatOptions](rc)
 	configPath := opts.StyluaConfig
 	if configPath == "" {
@@ -65,7 +64,7 @@ func formatAction(rc *pocket.RunContext) error {
 			return fmt.Errorf("get stylua config: %w", err)
 		}
 	}
-	return rc.ForEachPath(func(dir string) error {
+	return rc.ForEachPath(ctx, func(dir string) error {
 		absDir := pocket.FromGitRoot(dir)
 
 		needsFormat, checkOutput, err := formatCheck(ctx, configPath, absDir)
@@ -73,20 +72,20 @@ func formatAction(rc *pocket.RunContext) error {
 			return err
 		}
 		if !needsFormat {
-			pocket.Println(ctx, "No files in need of formatting.")
+			rc.Out.Println("No files in need of formatting.")
 			return nil
 		}
 
 		// Show diff in verbose mode.
 		if rc.Verbose && len(checkOutput) > 0 {
-			pocket.Printf(ctx, "%s", checkOutput)
+			rc.Out.Printf("%s", checkOutput)
 		}
 
 		// Now actually format.
 		if err := stylua.Run(ctx, "-f", configPath, absDir); err != nil {
 			return fmt.Errorf("stylua format failed in %s: %w", dir, err)
 		}
-		pocket.Println(ctx, "Formatted files.")
+		rc.Out.Println("Formatted files.")
 		return nil
 	})
 }

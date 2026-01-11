@@ -10,8 +10,9 @@ import (
 // Runnable is anything that can be executed as part of the build.
 // Both individual tasks and task groups implement this interface.
 type Runnable interface {
-	// Run executes this runnable.
-	Run(ctx context.Context) error
+	// Run executes this runnable with the given output.
+	// Output is passed explicitly rather than via context for clarity.
+	Run(ctx context.Context, out *Output) error
 
 	// Tasks returns all tasks contained in this runnable (for CLI registration).
 	Tasks() []*Task
@@ -38,12 +39,12 @@ func Serial(children ...Runnable) Runnable {
 	return &serial{children: children}
 }
 
-func (s *serial) Run(ctx context.Context) error {
+func (s *serial) Run(ctx context.Context, out *Output) error {
 	for _, child := range s.children {
 		if child == nil {
 			continue
 		}
-		if err := child.Run(ctx); err != nil {
+		if err := child.Run(ctx, out); err != nil {
 			return err
 		}
 	}
@@ -77,7 +78,7 @@ func Parallel(children ...Runnable) Runnable {
 	return &parallel{children: children}
 }
 
-func (p *parallel) Run(ctx context.Context) error {
+func (p *parallel) Run(ctx context.Context, out *Output) error {
 	g, ctx := errgroup.WithContext(ctx)
 	// Mutex to serialize output flushing so task outputs don't interleave.
 	var flushMu sync.Mutex
@@ -88,8 +89,8 @@ func (p *parallel) Run(ctx context.Context) error {
 		g.Go(func() error {
 			// Create a buffer for this task's output.
 			buf := &bufferedOutput{}
-			childCtx := withOutput(ctx, buf.Stdout(), buf.Stderr())
-			err := child.Run(childCtx)
+			bufOut := buf.Output()
+			err := child.Run(ctx, bufOut)
 			// Flush output atomically after task completes.
 			flushMu.Lock()
 			buf.Flush()

@@ -2,6 +2,7 @@
 package generate
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -16,7 +17,7 @@ func Task(cfg pocket.Config) *pocket.Task {
 }
 
 func generateAction(cfg *pocket.Config) pocket.TaskAction {
-	return func(rc *pocket.RunContext) error {
+	return func(_ context.Context, rc *pocket.RunContext) error {
 		shimPaths, err := scaffold.GenerateAll(cfg)
 		if err != nil {
 			return err

@@ -123,7 +123,7 @@ func run(
 	})
 
 	// Run the task.
-	if err := taskToRun.Run(ctx); err != nil {
+	if err := taskToRun.Run(ctx, StdOutput()); err != nil {
 		fmt.Fprintf(os.Stderr, "task %s failed: %v\n", taskToRun.Name, err)
 		return 1
 	}

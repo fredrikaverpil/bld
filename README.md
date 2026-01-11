@@ -63,8 +63,8 @@ var Config = pocket.Config{
 }
 
 // helloAction is defined separately from the task constructor.
-func helloAction(rc *pocket.RunContext) error {
-    pocket.Println(rc.Context(), "Hello from pocket!")
+func helloAction(_ context.Context, rc *pocket.RunContext) error {
+    rc.Out.Println("Hello from pocket!")
     return nil
 }
 
@@ -121,8 +121,9 @@ rely on CI to install them. Here's a task that uses golangci-lint:
 ```go
 import "github.com/fredrikaverpil/pocket/tools/golangcilint"
 
-func lintAction(rc *pocket.RunContext) error {
-    return golangcilint.Run(rc.Context(), "run", "./...")
+func lintAction(ctx context.Context, rc *pocket.RunContext) error {
+    _ = rc // unused in this example
+    return golangcilint.Run(ctx, "run", "./...")
 }
 
 var lintTask = pocket.NewTask("lint", "run linter", lintAction)
@@ -145,14 +146,13 @@ type DeployOptions struct {
 }
 
 // deployAction is the task implementation.
-func deployAction(rc *pocket.RunContext) error {
-    ctx := rc.Context()
+func deployAction(_ context.Context, rc *pocket.RunContext) error {
     opts := pocket.GetOptions[DeployOptions](rc)  // defaults merged with CLI flags
     if opts.DryRun {
-        pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
+        rc.Out.Printf("Would deploy to %s\n", opts.Env)
         return nil
     }
-    pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
+    rc.Out.Printf("Deploying to %s...\n", opts.Env)
     return nil
 }
 
@@ -437,10 +437,10 @@ pocket.FromBinDir("tool")     // path relative to .pocket/bin/
 pocket.BinaryName("mytool")   // appends .exe on Windows
 
 // Output (use these instead of fmt.Printf/Println in task actions)
-pocket.Printf(ctx, "Hello %s\n", name)  // writes to stdout, buffered for parallel tasks
-pocket.Println(ctx, "Done!")            // writes to stdout with newline
-pocket.Stdout(ctx)                      // io.Writer for stdout
-pocket.Stderr(ctx)                      // io.Writer for stderr
+rc.Out.Printf("Hello %s\n", name)  // writes to stdout, buffered for parallel tasks
+rc.Out.Println("Done!")            // writes to stdout with newline
+rc.Out.Stdout                      // io.Writer for stdout
+rc.Out.Stderr                      // io.Writer for stderr
 
 // Execution
 cmd := pocket.Command(ctx, "go", "build", "./...")  // PATH includes .pocket/bin/
@@ -456,7 +456,7 @@ opts := pocket.GetOptions[MyOptions](rc)  // retrieve typed options in action
 
 > [!NOTE]
 >
-> Use `pocket.Printf`/`pocket.Println` instead of `fmt.Printf`/`fmt.Println` in
+> Use `rc.Out.Printf`/`rc.Out.Println` instead of `fmt.Printf`/`fmt.Println` in
 > task actions. This ensures output is properly buffered when tasks run in
 > parallel, preventing interleaved output. Single tasks and serial execution
 > still get real-time output.

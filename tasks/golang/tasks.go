@@ -60,13 +60,13 @@ func Tasks(opts ...TasksOption) pocket.Runnable {
 	vulncheck := VulncheckTask()
 
 	return pocket.NewTaskGroup(format, lint, test, vulncheck).
-		RunWith(func(ctx context.Context) error {
+		RunWith(func(ctx context.Context, out *pocket.Output) error {
 			// Format and lint must run serially (lint after format).
-			if err := pocket.Serial(format, lint).Run(ctx); err != nil {
+			if err := pocket.Serial(format, lint).Run(ctx, out); err != nil {
 				return err
 			}
 			// Test and vulncheck can run in parallel.
-			return pocket.Parallel(test, vulncheck).Run(ctx)
+			return pocket.Parallel(test, vulncheck).Run(ctx, out)
 		}).
 		DetectByFile("go.mod")
 }
@@ -83,8 +83,7 @@ func FormatTask() *pocket.Task {
 }
 
 // formatAction is the action for the go-format task.
-func formatAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
+func formatAction(ctx context.Context, rc *pocket.RunContext) error {
 	opts := pocket.GetOptions[FormatOptions](rc)
 	configPath := opts.LintConfig
 	if configPath == "" {
@@ -94,7 +93,7 @@ func formatAction(rc *pocket.RunContext) error {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
 	}
-	return rc.ForEachPath(func(dir string) error {
+	return rc.ForEachPath(ctx, func(dir string) error {
 		absDir := pocket.FromGitRoot(dir)
 
 		needsFormat, diffOutput, err := formatCheck(ctx, configPath, absDir)
@@ -102,13 +101,13 @@ func formatAction(rc *pocket.RunContext) error {
 			return err
 		}
 		if !needsFormat {
-			pocket.Println(ctx, "No files in need of formatting.")
+			rc.Out.Println("No files in need of formatting.")
 			return nil
 		}
 
 		// Show diff in verbose mode.
 		if rc.Verbose {
-			pocket.Printf(ctx, "%s", diffOutput)
+			rc.Out.Printf("%s", diffOutput)
 		}
 
 		// Now actually format.
@@ -120,7 +119,7 @@ func formatAction(rc *pocket.RunContext) error {
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("golangci-lint fmt failed in %s: %w", dir, err)
 		}
-		pocket.Println(ctx, "Formatted files.")
+		rc.Out.Println("Formatted files.")
 		return nil
 	})
 }
@@ -151,8 +150,7 @@ func LintTask() *pocket.Task {
 }
 
 // lintAction is the action for the go-lint task.
-func lintAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
+func lintAction(ctx context.Context, rc *pocket.RunContext) error {
 	opts := pocket.GetOptions[LintOptions](rc)
 	configPath := opts.LintConfig
 	if configPath == "" {
@@ -162,7 +160,7 @@ func lintAction(rc *pocket.RunContext) error {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
 	}
-	return rc.ForEachPath(func(dir string) error {
+	return rc.ForEachPath(ctx, func(dir string) error {
 		cmd, err := golangcilint.Command(ctx, "run", "--allow-parallel-runners", "-c", configPath, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare golangci-lint: %w", err)
@@ -188,10 +186,9 @@ func TestTask() *pocket.Task {
 }
 
 // testAction is the action for the go-test task.
-func testAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
+func testAction(ctx context.Context, rc *pocket.RunContext) error {
 	opts := pocket.GetOptions[TestOptions](rc)
-	return rc.ForEachPath(func(dir string) error {
+	return rc.ForEachPath(ctx, func(dir string) error {
 		args := []string{"test"}
 		if rc.Verbose {
 			args = append(args, "-v")
@@ -226,9 +223,8 @@ func VulncheckTask() *pocket.Task {
 }
 
 // vulncheckAction is the action for the go-vulncheck task.
-func vulncheckAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
-	return rc.ForEachPath(func(dir string) error {
+func vulncheckAction(ctx context.Context, rc *pocket.RunContext) error {
+	return rc.ForEachPath(ctx, func(dir string) error {
 		cmd, err := govulncheck.Command(ctx, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare govulncheck: %w", err)

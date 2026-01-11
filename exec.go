@@ -13,18 +13,18 @@ import (
 const WaitDelay = 5 * time.Second
 
 // Command creates an exec.Cmd with PATH prepended with .pocket/bin,
-// stdout/stderr connected, and graceful shutdown configured.
+// stdout/stderr connected to os.Stdout/os.Stderr, and graceful shutdown configured.
 //
 // When the context is cancelled, the command receives SIGINT first
 // (allowing graceful shutdown), then SIGKILL after WaitDelay.
 //
-// Output is directed to the writers from context (set by Parallel for buffering)
-// or directly to os.Stdout/os.Stderr for serial execution.
+// To redirect output (e.g., for buffering in parallel execution),
+// set cmd.Stdout and cmd.Stderr after creating the command.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = PrependPath(os.Environ(), FromBinDir())
-	cmd.Stdout = Stdout(ctx)
-	cmd.Stderr = Stderr(ctx)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	setGracefulShutdown(cmd)
 	return cmd
 }
