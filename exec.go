@@ -20,26 +20,34 @@ var (
 	colorEnvVars []string // extra env vars to force colors
 )
 
+// colorForceEnvVars are the environment variables set to force color output.
+var colorForceEnvVars = []string{
+	"FORCE_COLOR=1",       // Node.js, chalk, many modern tools
+	"CLICOLOR_FORCE=1",    // BSD/macOS convention
+	"COLORTERM=truecolor", // Indicates color support
+}
+
+// computeColorEnv determines which color env vars to use.
+// isTTY: whether stdout is a terminal
+// noColorSet: whether NO_COLOR env var is set.
+func computeColorEnv(isTTY, noColorSet bool) []string {
+	// Respect NO_COLOR convention (https://no-color.org/).
+	if noColorSet {
+		return nil
+	}
+	// Only force colors if stdout is a terminal.
+	if !isTTY {
+		return nil
+	}
+	return colorForceEnvVars
+}
+
 // initColorEnv detects if stdout is a TTY and prepares env vars to force colors.
 // This is called once on first Command() call.
 func initColorEnv() {
-	// Respect NO_COLOR convention (https://no-color.org/).
-	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
-		return
-	}
-
-	// Check if stdout is a terminal.
-	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		return
-	}
-
-	// Stdout is a TTY and NO_COLOR is not set.
-	// Add env vars that force colors in common tools.
-	colorEnvVars = []string{
-		"FORCE_COLOR=1",       // Node.js, chalk, many modern tools
-		"CLICOLOR_FORCE=1",    // BSD/macOS convention
-		"COLORTERM=truecolor", // Indicates color support
-	}
+	_, noColor := os.LookupEnv("NO_COLOR")
+	isTTY := term.IsTerminal(int(os.Stdout.Fd()))
+	colorEnvVars = computeColorEnv(isTTY, noColor)
 }
 
 // Command creates an exec.Cmd with PATH prepended with .pocket/bin,
