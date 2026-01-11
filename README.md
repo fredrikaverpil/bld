@@ -30,6 +30,13 @@ pocket handle tool installation.
       worry users starts using things we cannot refactor later.
   - [ ] Move as much as possible into an internal folder, that export parts of
         Pocket that is only intended for the internals powering Pocket.
+- [ ] Diagrams/tables showing how Pocket works in different senses. I would like
+      to explain;
+  - [ ] Project config driven command execution
+  - [ ] Path resolver behavior
+  - [ ] What a "Runnable" is, and how it gets executed
+    - [ ] Concurrency
+    - [ ] Errors
 
 ## Quickstart
 
