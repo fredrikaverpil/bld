@@ -21,30 +21,25 @@ type RunContext struct {
 	Verbose bool     // verbose mode enabled
 	Out     *Output  // output writers for stdout/stderr
 
-	// Internal fields
-	cwd           string                       // where CLI was invoked (relative to git root)
-	parsedOptions any                          // typed options, access via GetOptions[T](rc)
-	exec          *execution                   // tracks which tasks have run
-	taskPaths     map[string][]string          // task name -> resolved paths
-	taskArgs      map[string]map[string]string // task name -> CLI args
-	skipRules     []skipRule                   // task skip rules
+	// Internal composition
+	state         *executionState // shared across execution tree
+	setup         *taskSetup      // accumulated during tree traversal
+	parsedOptions any             // per-task: typed options, access via GetOptions[T](rc)
 }
 
 // NewRunContext creates a RunContext for a new execution.
 func NewRunContext(out *Output, verbose bool, cwd string) *RunContext {
 	return &RunContext{
-		Out:       out,
-		Verbose:   verbose,
-		cwd:       cwd,
-		exec:      newExecution(),
-		taskPaths: make(map[string][]string),
-		taskArgs:  make(map[string]map[string]string),
+		Out:     out,
+		Verbose: verbose,
+		state:   newExecutionState(cwd, verbose),
+		setup:   newTaskSetup(),
 	}
 }
 
 // CWD returns the current working directory relative to git root.
 func (rc *RunContext) CWD() string {
-	return rc.cwd
+	return rc.state.cwd
 }
 
 // withOutput returns a copy with different output (for parallel buffering).
@@ -60,19 +55,19 @@ func (rc *RunContext) withOutput(out *Output) *RunContext {
 // withSkipRules returns a copy with additional skip rules.
 func (rc *RunContext) withSkipRules(rules []skipRule) *RunContext {
 	cp := *rc
-	cp.skipRules = append(slices.Clone(rc.skipRules), rules...)
+	cp.setup = rc.setup.withSkipRules(rules)
 	return &cp
 }
 
 // setTaskPaths sets resolved paths for a task.
 func (rc *RunContext) setTaskPaths(taskName string, paths []string) {
-	rc.taskPaths[taskName] = paths
+	rc.setup.paths[taskName] = paths
 }
 
 // SetTaskArgs sets CLI arguments for a task. This is used by the CLI
 // to pass parsed command-line arguments to the task.
 func (rc *RunContext) SetTaskArgs(taskName string, args map[string]string) {
-	rc.taskArgs[taskName] = args
+	rc.setup.args[taskName] = args
 }
 
 // ForEachPath executes fn for each path in the context.
@@ -95,7 +90,7 @@ func (rc *RunContext) ForEachPath(ctx context.Context, fn func(dir string) error
 
 // isSkipped checks if a task should be skipped for a given path.
 func (rc *RunContext) isSkipped(taskName, path string) bool {
-	for _, rule := range rc.skipRules {
+	for _, rule := range rc.setup.skipRules {
 		if rule.taskName != taskName {
 			continue
 		}
@@ -107,6 +102,52 @@ func (rc *RunContext) isSkipped(taskName, path string) bool {
 		}
 	}
 	return false
+}
+
+// shouldSkipGlobally checks if a task should be skipped entirely (global skip rule).
+func (rc *RunContext) shouldSkipGlobally(taskName string) bool {
+	return rc.isSkipped(taskName, "")
+}
+
+// resolveAndFilterPaths returns the paths for a task after applying skip filters.
+// Returns the paths to run and the paths that were skipped.
+func (rc *RunContext) resolveAndFilterPaths(taskName string) (paths, skipped []string) {
+	// Determine paths, defaulting to cwd if not set.
+	all := rc.setup.paths[taskName]
+	if len(all) == 0 {
+		all = []string{rc.state.cwd}
+	}
+
+	// Filter out paths that should be skipped.
+	for _, p := range all {
+		if !rc.isSkipped(taskName, p) {
+			paths = append(paths, p)
+		} else {
+			skipped = append(skipped, p)
+		}
+	}
+	return paths, skipped
+}
+
+// printTaskHeader writes the task execution header to output.
+func (rc *RunContext) printTaskHeader(taskName string, skippedPaths []string) {
+	if len(skippedPaths) > 0 {
+		fmt.Fprintf(rc.Out.Stdout, "=== %s (skipped in: %s)\n", taskName, strings.Join(skippedPaths, ", "))
+	} else {
+		fmt.Fprintf(rc.Out.Stdout, "=== %s\n", taskName)
+	}
+}
+
+// buildTaskContext creates a task-specific RunContext with the given paths and options.
+func (rc *RunContext) buildTaskContext(paths []string, opts any) *RunContext {
+	return &RunContext{
+		Paths:         paths,
+		Verbose:       rc.Verbose,
+		Out:           rc.Out,
+		state:         rc.state, // shared
+		setup:         rc.setup, // shared
+		parsedOptions: opts,
+	}
 }
 
 // execution tracks which tasks have run in a single execution.
@@ -244,72 +285,41 @@ func (t *Task) AsBuiltin() *Task {
 // - Global skip (no paths): task doesn't run at all
 // - Path-specific skip: those paths are filtered from execution.
 func (t *Task) Run(ctx context.Context, rc *RunContext) error {
+	dedup := rc.state.dedup
+
 	// Check if already done in this execution.
-	if done, err := rc.exec.isDone(t.Name); done {
+	if done, err := dedup.isDone(t.Name); done {
 		return err
 	}
 
-	// Check for global skip (rule with no paths).
-	if rc.isSkipped(t.Name, "") {
-		rc.exec.markDone(t.Name, nil)
+	// Check for global skip.
+	if rc.shouldSkipGlobally(t.Name) {
+		dedup.markDone(t.Name, nil)
 		return nil
 	}
 
-	// Determine paths, defaulting to cwd if not set.
-	paths := rc.taskPaths[t.Name]
+	// Resolve paths and filter skipped ones.
+	paths, skipped := rc.resolveAndFilterPaths(t.Name)
 	if len(paths) == 0 {
-		paths = []string{rc.cwd}
-	}
-
-	// Filter out paths that should be skipped.
-	var filteredPaths []string
-	var skippedPaths []string
-	for _, p := range paths {
-		if !rc.isSkipped(t.Name, p) {
-			filteredPaths = append(filteredPaths, p)
-		} else {
-			skippedPaths = append(skippedPaths, p)
-		}
-	}
-
-	// If all paths are skipped, don't run.
-	if len(filteredPaths) == 0 {
 		fmt.Fprintf(rc.Out.Stdout, "=== %s (skipped)\n", t.Name)
-		rc.exec.markDone(t.Name, nil)
+		dedup.markDone(t.Name, nil)
 		return nil
 	}
 
-	// Show task name with any skipped paths.
-	if len(skippedPaths) > 0 {
-		fmt.Fprintf(rc.Out.Stdout, "=== %s (skipped in: %s)\n", t.Name, strings.Join(skippedPaths, ", "))
-	} else {
-		fmt.Fprintf(rc.Out.Stdout, "=== %s\n", t.Name)
-	}
+	// Print task header.
+	rc.printTaskHeader(t.Name, skipped)
 
-	// Parse typed options (merge defaults from t.Options with CLI overrides).
-	args := rc.taskArgs[t.Name]
-	parsedOptions, err := parseOptionsFromCLI(t.Options, args)
+	// Parse typed options.
+	opts, err := parseOptionsFromCLI(t.Options, rc.setup.args[t.Name])
 	if err != nil {
-		rc.exec.markDone(t.Name, fmt.Errorf("parse options: %w", err))
+		dedup.markDone(t.Name, fmt.Errorf("parse options: %w", err))
 		return err
 	}
 
-	// Build task-specific RunContext.
-	taskRC := &RunContext{
-		Paths:         filteredPaths,
-		Verbose:       rc.Verbose,
-		Out:           rc.Out,
-		cwd:           rc.cwd,
-		parsedOptions: parsedOptions,
-		exec:          rc.exec,
-		taskPaths:     rc.taskPaths,
-		taskArgs:      rc.taskArgs,
-		skipRules:     rc.skipRules,
-	}
-
-	// Run the action.
+	// Build task-specific RunContext and run the action.
+	taskRC := rc.buildTaskContext(paths, opts)
 	err = t.Action(ctx, taskRC)
-	rc.exec.markDone(t.Name, err)
+	dedup.markDone(t.Name, err)
 	return err
 }
 

@@ -118,7 +118,7 @@ func run(
 
 	// Set CLI args for the task being run.
 	if taskArgs != nil {
-		rc.taskArgs[taskToRun.Name] = taskArgs
+		rc.SetTaskArgs(taskToRun.Name, taskArgs)
 	}
 
 	// Run the task.
