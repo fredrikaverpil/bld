@@ -2,6 +2,7 @@ package pocket
 
 import (
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -55,10 +56,8 @@ func TestComputeColorEnv(t *testing.T) {
 				if !hasForceColor {
 					t.Error("expected FORCE_COLOR=1 in color env vars")
 				}
-			} else {
-				if len(got) != 0 {
-					t.Errorf("expected no color env vars, got %v", got)
-				}
+			} else if len(got) != 0 {
+				t.Errorf("expected no color env vars, got %v", got)
 			}
 		})
 	}
@@ -89,13 +88,7 @@ func TestPrependPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := PrependPath(tt.env, tt.dir)
-			found := false
-			for _, v := range got {
-				if v == tt.wantPath {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(got, tt.wantPath)
 			if !found {
 				t.Errorf("PrependPath() = %v, want PATH containing %q", got, tt.wantPath)
 			}
