@@ -39,7 +39,9 @@ pocket handle tool installation.
   `sync.Once` would save ~10 lines but prevents re-running tasks in tests and
   library usage (same Task instance becomes "used up"). Current approach creates
   fresh `dedupTracker` per `Execution`, allowing task reuse across runs.
-- [ ] We lost output colors with buffered output. Can we do something about it?
+- [x] We lost output colors with buffered output. Fixed by detecting if stdout
+  is a TTY and setting `FORCE_COLOR=1`, `CLICOLOR_FORCE=1` env vars for
+  subprocesses. Tools now output ANSI codes even when buffered.
 - [ ] Make as much parts of Pocket as possible non-exported, so we don't have to
   worry users starts using things we cannot refactor later.
   - [ ] Move as much as possible into an internal folder, that export parts of

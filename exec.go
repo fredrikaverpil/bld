@@ -5,12 +5,42 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // WaitDelay is the grace period given to child processes to handle
 // termination signals before being force-killed.
 const WaitDelay = 5 * time.Second
+
+var (
+	colorEnvOnce sync.Once
+	colorEnvVars []string // extra env vars to force colors
+)
+
+// initColorEnv detects if stdout is a TTY and prepares env vars to force colors.
+// This is called once on first Command() call.
+func initColorEnv() {
+	// Respect NO_COLOR convention (https://no-color.org/).
+	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
+		return
+	}
+
+	// Check if stdout is a terminal.
+	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		return
+	}
+
+	// Stdout is a TTY and NO_COLOR is not set.
+	// Add env vars that force colors in common tools.
+	colorEnvVars = []string{
+		"FORCE_COLOR=1",       // Node.js, chalk, many modern tools
+		"CLICOLOR_FORCE=1",    // BSD/macOS convention
+		"COLORTERM=truecolor", // Indicates color support
+	}
+}
 
 // Command creates an exec.Cmd with PATH prepended with .pocket/bin,
 // stdout/stderr connected to os.Stdout/os.Stderr, and graceful shutdown configured.
@@ -18,11 +48,18 @@ const WaitDelay = 5 * time.Second
 // When the context is cancelled, the command receives SIGINT first
 // (allowing graceful shutdown), then SIGKILL after WaitDelay.
 //
+// If stdout is a TTY, color-forcing environment variables are added so that
+// tools output ANSI colors even when their output is buffered (for parallel execution).
+//
 // To redirect output (e.g., for buffering in parallel execution),
 // set cmd.Stdout and cmd.Stderr after creating the command.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
+	colorEnvOnce.Do(initColorEnv)
+
 	cmd := exec.CommandContext(ctx, name, args...)
-	cmd.Env = PrependPath(os.Environ(), FromBinDir())
+	env := PrependPath(os.Environ(), FromBinDir())
+	env = append(env, colorEnvVars...)
+	cmd.Env = env
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	setGracefulShutdown(cmd)
