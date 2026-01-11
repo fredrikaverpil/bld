@@ -64,7 +64,7 @@ var Config = pocket.Config{
 
 // helloAction is defined separately from the task constructor.
 func helloAction(rc *pocket.RunContext) error {
-    pocket.Println(rc.Context(), "Hello from pocket!")
+    rc.Println("Hello from pocket!")
     return nil
 }
 
@@ -146,13 +146,12 @@ type DeployOptions struct {
 
 // deployAction is the task implementation.
 func deployAction(rc *pocket.RunContext) error {
-    ctx := rc.Context()
     opts := pocket.GetOptions[DeployOptions](rc)  // defaults merged with CLI flags
     if opts.DryRun {
-        pocket.Printf(ctx, "Would deploy to %s\n", opts.Env)
+        rc.Printf("Would deploy to %s\n", opts.Env)
         return nil
     }
-    pocket.Printf(ctx, "Deploying to %s...\n", opts.Env)
+    rc.Printf("Deploying to %s...\n", opts.Env)
     return nil
 }
 
@@ -436,15 +435,22 @@ pocket.FromPocketDir("file")  // path relative to .pocket/
 pocket.FromBinDir("tool")     // path relative to .pocket/bin/
 pocket.BinaryName("mytool")   // appends .exe on Windows
 
-// Output (use these instead of fmt.Printf/Println in task actions)
-pocket.Printf(ctx, "Hello %s\n", name)  // writes to stdout, buffered for parallel tasks
-pocket.Println(ctx, "Done!")            // writes to stdout with newline
+// Output (preferred: use RunContext methods in task actions)
+rc.Printf("Hello %s\n", name)           // writes to stdout, buffered for parallel tasks
+rc.Println("Done!")                     // writes to stdout with newline
+
+// Output (alternative: package functions for tool packages or when you only have ctx)
+pocket.Printf(ctx, "Hello %s\n", name)
+pocket.Println(ctx, "Done!")
 pocket.Stdout(ctx)                      // io.Writer for stdout
 pocket.Stderr(ctx)                      // io.Writer for stderr
 
-// Execution
-cmd := pocket.Command(ctx, "go", "build", "./...")  // PATH includes .pocket/bin/
+// Execution (preferred: use RunContext method in task actions)
+cmd := rc.Command("go", "build", "./...")  // PATH includes .pocket/bin/
 cmd.Run()
+
+// Execution (alternative: package function for tool packages)
+cmd := pocket.Command(ctx, "go", "build", "./...")
 
 // Detection (for Detectable interface)
 pocket.DetectByFile("go.mod")       // dirs containing file

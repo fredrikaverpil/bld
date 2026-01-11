@@ -3,6 +3,7 @@ package pocket
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"slices"
 	"strings"
 	"sync"
@@ -12,7 +13,25 @@ import (
 // Actions receive RunContext (which provides context via rc.Context()) and return an error if the task fails.
 type TaskAction func(rc *RunContext) error
 
-// RunContext provides runtime context to Actions.
+// RunContext provides runtime context to task actions.
+//
+// RunContext is the primary interface for task authors. It provides:
+//   - Paths: directories this task should operate on
+//   - Printf/Println: output that respects parallel buffering
+//   - Command: create commands with proper cancellation and output handling
+//   - ForEachPath: iterate over paths with cancellation support
+//   - Context: access the underlying context (rarely needed)
+//
+// Example usage:
+//
+//	func myAction(rc *pocket.RunContext) error {
+//	    rc.Printf("Processing %d paths\n", len(rc.Paths))
+//	    return rc.ForEachPath(func(dir string) error {
+//	        cmd := rc.Command("go", "build", "./...")
+//	        cmd.Dir = dir
+//	        return cmd.Run()
+//	    })
+//	}
 type RunContext struct {
 	Paths   []string // resolved paths for this task (from Paths wrapper)
 	Verbose bool     // verbose mode enabled
@@ -48,6 +67,24 @@ func (rc *RunContext) ForEachPath(fn func(dir string) error) error {
 		}
 	}
 	return nil
+}
+
+// Printf formats and prints to stdout.
+// This is a convenience method that uses the correct output writer for parallel execution.
+func (rc *RunContext) Printf(format string, a ...any) (int, error) {
+	return Printf(rc.Context(), format, a...)
+}
+
+// Println prints to stdout with a newline.
+// This is a convenience method that uses the correct output writer for parallel execution.
+func (rc *RunContext) Println(a ...any) (int, error) {
+	return Println(rc.Context(), a...)
+}
+
+// Command creates an exec.Cmd with proper output handling and graceful shutdown.
+// This is a convenience method equivalent to pocket.Command(rc.Context(), name, args...).
+func (rc *RunContext) Command(name string, args ...string) *exec.Cmd {
+	return Command(rc.Context(), name, args...)
 }
 
 // Task represents a runnable task.

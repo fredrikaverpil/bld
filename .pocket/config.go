@@ -30,13 +30,12 @@ type GreetOptions struct {
 
 // greetAction is the action for the greet task.
 func greetAction(rc *pocket.RunContext) error {
-	ctx := rc.Context()
 	opts := pocket.GetOptions[GreetOptions](rc)
 	name := opts.Name
 	if name == "" {
 		name = "world"
 	}
-	pocket.Printf(ctx, "Hello, %s!\n", name)
+	rc.Printf("Hello, %s!\n", name)
 	return nil
 }
 
