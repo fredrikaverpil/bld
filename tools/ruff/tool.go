@@ -23,13 +23,9 @@ const pythonVersion = "3.12"
 //go:embed ruff.toml
 var defaultConfig []byte
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running ruff.
-var Command = t.Command
-
-// Run installs (if needed) and executes ruff.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(ruff.T).Run(ctx, "check", ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 var configSpec = tool.ConfigSpec{
 	ToolName:          name,

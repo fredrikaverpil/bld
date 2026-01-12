@@ -16,13 +16,9 @@ const name = "uv"
 // renovate: datasource=github-releases depName=astral-sh/uv
 const version = "0.7.13"
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running uv.
-var Command = t.Command
-
-// Run installs (if needed) and executes uv.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(uv.T).Run(ctx, "venv", ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 // CreateVenv creates a Python virtual environment at the specified path.
 // If pythonVersion is empty, uv uses the default Python available.
@@ -32,17 +28,17 @@ func CreateVenv(ctx context.Context, venvPath, pythonVersion string) error {
 		args = append(args, "--python", pythonVersion)
 	}
 	args = append(args, venvPath)
-	return Run(ctx, args...)
+	return T.Run(ctx, args...)
 }
 
 // PipInstall installs a package into a virtual environment.
 func PipInstall(ctx context.Context, venvPath, pkg string) error {
-	return Run(ctx, "pip", "install", "--python", venvPython(venvPath), pkg)
+	return T.Run(ctx, "pip", "install", "--python", venvPython(venvPath), pkg)
 }
 
 // PipInstallRequirements installs packages from a requirements.txt file.
 func PipInstallRequirements(ctx context.Context, venvPath, requirementsPath string) error {
-	return Run(ctx, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
+	return T.Run(ctx, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
 }
 
 // venvPython returns the path to the Python executable in a venv.

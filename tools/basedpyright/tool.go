@@ -19,13 +19,9 @@ const version = "1.37.0"
 // pythonVersion specifies the Python version for the virtual environment.
 const pythonVersion = "3.12"
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running basedpyright.
-var Command = t.Command
-
-// Run installs (if needed) and executes basedpyright.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(basedpyright.T).Run(ctx, ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 // Prepare ensures basedpyright is installed.
 func Prepare(ctx context.Context) error {

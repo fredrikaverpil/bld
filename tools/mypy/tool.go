@@ -19,13 +19,9 @@ const version = "1.19.1"
 // pythonVersion specifies the Python version for the virtual environment.
 const pythonVersion = "3.12"
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running mypy.
-var Command = t.Command
-
-// Run installs (if needed) and executes mypy.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(mypy.T).Run(ctx, ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 // Prepare ensures mypy is installed.
 func Prepare(ctx context.Context) error {

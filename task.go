@@ -3,6 +3,7 @@ package pocket
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"slices"
 	"strings"
 	"sync"
@@ -165,6 +166,78 @@ func (tc *TaskContext) ForEachPath(ctx context.Context, fn func(dir string) erro
 		}
 	}
 	return nil
+}
+
+// Command creates an exec.Cmd with output wired to this task's output writers.
+// This ensures command output is properly buffered when running in parallel.
+//
+// The command has:
+//   - PATH prepended with .pocket/bin/
+//   - Color-forcing environment variables (when stdout is a TTY)
+//   - Graceful shutdown on context cancellation
+//   - Stdout/Stderr connected to tc.Out (for proper parallel buffering)
+//
+// Example:
+//
+//	cmd := tc.Command(ctx, "go", "test", "./...")
+//	cmd.Dir = pocket.FromGitRoot(dir)
+//	return cmd.Run()
+func (tc *TaskContext) Command(ctx context.Context, name string, args ...string) *exec.Cmd {
+	cmd := commandBase(ctx, name, args...)
+	cmd.Stdout = tc.Out.Stdout
+	cmd.Stderr = tc.Out.Stderr
+	return cmd
+}
+
+// Tooler is an interface for tools that can create commands.
+// This matches the *tool.Tool type from the tool package.
+type Tooler interface {
+	// Command prepares the tool and returns an exec.Cmd for running it.
+	Command(ctx context.Context, args ...string) (*exec.Cmd, error)
+}
+
+// Tool returns a ToolRunner that wraps a tool with output wiring.
+// Commands created through the ToolRunner have their output automatically
+// connected to this task's output writers for proper parallel buffering.
+//
+// Example:
+//
+//	cmd, err := tc.Tool(golangcilint.T).Command(ctx, "run", "./...")
+//	if err != nil {
+//	    return err
+//	}
+//	cmd.Dir = pocket.FromGitRoot(dir)
+//	return cmd.Run()
+func (tc *TaskContext) Tool(t Tooler) *ToolRunner {
+	return &ToolRunner{tool: t, out: tc.Out}
+}
+
+// ToolRunner wraps a tool with output wiring.
+// It ensures commands created from the tool have their output connected
+// to the task's output writers.
+type ToolRunner struct {
+	tool Tooler
+	out  *Output
+}
+
+// Command prepares the tool and returns an exec.Cmd with output wired.
+func (tr *ToolRunner) Command(ctx context.Context, args ...string) (*exec.Cmd, error) {
+	cmd, err := tr.tool.Command(ctx, args...)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stdout = tr.out.Stdout
+	cmd.Stderr = tr.out.Stderr
+	return cmd, nil
+}
+
+// Run prepares and executes the tool with output wired.
+func (tr *ToolRunner) Run(ctx context.Context, args ...string) error {
+	cmd, err := tr.Command(ctx, args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
 }
 
 // dedupTracker tracks which tasks have run in a single execution.

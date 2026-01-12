@@ -20,13 +20,9 @@ const version = "2.7.1"
 //go:embed golangci.yml
 var defaultConfig []byte
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running golangci-lint.
-var Command = t.Command
-
-// Run installs (if needed) and executes golangci-lint.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(golangcilint.T).Run(ctx, "run", "./...").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 var configSpec = tool.ConfigSpec{
 	ToolName:          name,

@@ -20,14 +20,14 @@ var tools = []struct {
 	run         func(context.Context, ...string) error
 	versionArgs []string
 }{
-	{"golangci-lint", golangcilint.Prepare, golangcilint.Run, []string{"version"}},
-	{"govulncheck", govulncheck.Prepare, govulncheck.Run, []string{"-version"}},
-	{"uv", uv.Prepare, uv.Run, []string{"--version"}},
-	{"mdformat", mdformat.Prepare, mdformat.Run, []string{"--version"}},
-	{"ruff", ruff.Prepare, ruff.Run, []string{"--version"}},
-	{"mypy", mypy.Prepare, mypy.Run, []string{"--version"}},
-	{"basedpyright", basedpyright.Prepare, basedpyright.Run, []string{"--version"}},
-	{"stylua", stylua.Prepare, stylua.Run, []string{"--version"}},
+	{"golangci-lint", golangcilint.Prepare, golangcilint.T.Run, []string{"version"}},
+	{"govulncheck", govulncheck.Prepare, govulncheck.T.Run, []string{"-version"}},
+	{"uv", uv.Prepare, uv.T.Run, []string{"--version"}},
+	{"mdformat", mdformat.Prepare, mdformat.T.Run, []string{"--version"}},
+	{"ruff", ruff.Prepare, ruff.T.Run, []string{"--version"}},
+	{"mypy", mypy.Prepare, mypy.T.Run, []string{"--version"}},
+	{"basedpyright", basedpyright.Prepare, basedpyright.T.Run, []string{"--version"}},
+	{"stylua", stylua.Prepare, stylua.T.Run, []string{"--version"}},
 }
 
 func TestTools(t *testing.T) {

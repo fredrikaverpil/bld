@@ -23,13 +23,9 @@ const pythonVersion = "3.13"
 //go:embed requirements.txt
 var requirements []byte
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running mdformat.
-var Command = t.Command
-
-// Run installs (if needed) and executes mdformat.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(mdformat.T).Run(ctx, ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 // versionHash creates a unique hash based on requirements and Python version.
 // This ensures the venv is recreated when dependencies or Python version change.

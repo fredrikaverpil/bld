@@ -20,13 +20,9 @@ const version = "2.3.1"
 //go:embed stylua.toml
 var defaultConfig []byte
 
-var t = &tool.Tool{Name: name, Prepare: Prepare}
-
-// Command prepares the tool and returns an exec.Cmd for running stylua.
-var Command = t.Command
-
-// Run installs (if needed) and executes stylua.
-var Run = t.Run
+// T is the tool instance for use with TaskContext.Tool().
+// Example: tc.Tool(stylua.T).Run(ctx, ".").
+var T = &tool.Tool{Name: name, Prepare: Prepare}
 
 var configSpec = tool.ConfigSpec{
 	ToolName:          name,

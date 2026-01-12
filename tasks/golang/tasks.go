@@ -111,7 +111,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		cmd, err := golangcilint.Command(ctx, "fmt", "-c", configPath, "./...")
+		cmd, err := tc.Tool(golangcilint.T).Command(ctx, "fmt", "-c", configPath, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare golangci-lint: %w", err)
 		}
@@ -127,7 +127,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 // formatCheck runs golangci-lint fmt --diff to check if formatting is needed.
 // Returns true if files need formatting, along with the diff output.
 func formatCheck(ctx context.Context, configPath, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := golangcilint.Command(ctx, "fmt", "-c", configPath, "--diff", "./...")
+	cmd, err := golangcilint.T.Command(ctx, "fmt", "-c", configPath, "--diff", "./...")
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare golangci-lint: %w", err)
 	}
@@ -161,7 +161,7 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 	}
 	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := golangcilint.Command(ctx, "run", "--allow-parallel-runners", "-c", configPath, "./...")
+		cmd, err := tc.Tool(golangcilint.T).Command(ctx, "run", "--allow-parallel-runners", "-c", configPath, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare golangci-lint: %w", err)
 		}
@@ -208,7 +208,7 @@ func testAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 		args = append(args, "./...")
 
-		cmd := pocket.Command(ctx, "go", args...)
+		cmd := tc.Command(ctx, "go", args...)
 		cmd.Dir = pocket.FromGitRoot(dir)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("go test failed in %s: %w", dir, err)
@@ -225,7 +225,7 @@ func VulncheckTask() *pocket.Task {
 // vulncheckAction is the action for the go-vulncheck task.
 func vulncheckAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := govulncheck.Command(ctx, "./...")
+		cmd, err := tc.Tool(govulncheck.T).Command(ctx, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare govulncheck: %w", err)
 		}

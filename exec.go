@@ -50,6 +50,19 @@ func initColorEnv() {
 	colorEnvVars = computeColorEnv(isTTY, noColor)
 }
 
+// commandBase creates an exec.Cmd with common setup but no output configuration.
+// This is used internally by Command and TaskContext.Command.
+func commandBase(ctx context.Context, name string, args ...string) *exec.Cmd {
+	colorEnvOnce.Do(initColorEnv)
+
+	cmd := exec.CommandContext(ctx, name, args...)
+	env := PrependPath(os.Environ(), FromBinDir())
+	env = append(env, colorEnvVars...)
+	cmd.Env = env
+	setGracefulShutdown(cmd)
+	return cmd
+}
+
 // Command creates an exec.Cmd with PATH prepended with .pocket/bin,
 // stdout/stderr connected to os.Stdout/os.Stderr, and graceful shutdown configured.
 //
@@ -59,18 +72,15 @@ func initColorEnv() {
 // If stdout is a TTY, color-forcing environment variables are added so that
 // tools output ANSI colors even when their output is buffered (for parallel execution).
 //
+// Note: For commands run from task actions, prefer TaskContext.Command() which
+// automatically wires output to the task's output writers for proper parallel buffering.
+//
 // To redirect output (e.g., for buffering in parallel execution),
 // set cmd.Stdout and cmd.Stderr after creating the command.
 func Command(ctx context.Context, name string, args ...string) *exec.Cmd {
-	colorEnvOnce.Do(initColorEnv)
-
-	cmd := exec.CommandContext(ctx, name, args...)
-	env := PrependPath(os.Environ(), FromBinDir())
-	env = append(env, colorEnvVars...)
-	cmd.Env = env
+	cmd := commandBase(ctx, name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	setGracefulShutdown(cmd)
 	return cmd
 }
 
