@@ -42,7 +42,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		if err := tc.Tool(mdformat.T).Run(ctx, absDir); err != nil {
+		if err := tc.Tool(mdformat.T).Run(ctx, "--number", "--wrap", "80", absDir); err != nil {
 			return fmt.Errorf("mdformat failed in %s: %w", dir, err)
 		}
 		tc.Out.Println("Formatted files.")
@@ -53,7 +53,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 // formatCheck runs mdformat --check to see if formatting is needed.
 // Returns true if files need formatting, along with the check output.
 func formatCheck(ctx context.Context, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := mdformat.T.Command(ctx, "--check", dir)
+	cmd, err := mdformat.T.Command(ctx, "--check", "--number", "--wrap", "80", dir)
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare mdformat: %w", err)
 	}
