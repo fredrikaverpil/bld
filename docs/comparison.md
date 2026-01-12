@@ -125,6 +125,7 @@ Generates Makefiles from Go code for IDE integration.
 
 - Curated set of tools for Go projects
 - Generates Makefiles for discoverability
+- Auto-downloads Go if not installed
 - Dependabot integration out of the box
 - Well-maintained tool ecosystem
 
@@ -134,11 +135,12 @@ Generates Makefiles from Go code for IDE integration.
 - Tied to Einride's tooling opinions
 - Makefile generation adds complexity
 
-**Comparison to Pocket:** Pocket was inspired by Sage but differs in:
+**Comparison to Pocket:** Pocket was inspired by Sage. Both auto-download Go if
+not installed, enabling zero-setup CI. They differ in:
 
 - No Makefile generation (pure Go execution)
 - Cross-platform shim without Make dependency
-- Different path filtering approach for monorepos
+- Path filtering and auto-detection for monorepos
 
 **Example:**
 
@@ -456,10 +458,17 @@ builds.
 | Path filtering      | ✅     | ❌   | ❌   | ❌   | ❌   | ❌     | ❌      | ✅    |
 | Auto-detection      | ✅     | ❌   | ❌   | ❌   | ❌   | ❌     | ❌      | ❌    |
 | Remote caching      | ❌     | ❌   | ❌   | ❌   | ❌   | ✅     | ✅      | ✅    |
-| CI portability      | ⚠️     | ⚠️   | ⚠️   | ⚠️   | ⚠️   | ✅     | ✅      | ✅    |
+| CI portability      | ✅     | ✅   | ⚠️   | ⚠️   | ⚠️   | ✅     | ✅      | ✅    |
 | Setup complexity    | Low    | Low  | Low  | Low  | Low  | Medium | Medium  | High  |
 
 Legend: ✅ Full support | ⚠️ Partial/Limited | ❌ Not available
+
+**CI portability notes:**
+
+- Pocket and Sage auto-download Go if not installed — CI config is just
+  `./pok` or `make`
+- Dagger, Earthly, Bazel use containers or hermetic builds for full isolation
+- Mage, Task, Just require pre-installing the runtime on CI
 
 ---
 
