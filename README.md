@@ -21,6 +21,9 @@ pocket handle tool installation.
 - **Tool management**: Downloads and caches tools in `.pocket/`
 - **Simple invocation**: Just `./pok` or `./pok -h` to list tasks
 
+See [how Pocket compares](docs/comparison.md) to Mage, Sage, Task, Dagger, and
+other build tools.
+
 ### Todos
 
 - [ ] `./pok -v` and e.g. `./pok go-test -v` does not output buffered correctly:
