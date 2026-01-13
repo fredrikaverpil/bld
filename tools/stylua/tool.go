@@ -23,7 +23,7 @@ var defaultConfig []byte
 // Example usage in a task action:
 //
 //	configPath, _ := stylua.Tool.ConfigPath()
-//	stylua.Tool.Run(ctx, tc, "-f", configPath, ".")
+//	stylua.Tool.Exec(ctx, tc, "-f", configPath, ".")
 var Tool = pocket.NewTool(name, version, install).
 	WithConfig(pocket.ToolConfig{
 		UserFiles:   []string{"stylua.toml", ".stylua.toml"},

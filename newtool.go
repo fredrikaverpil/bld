@@ -6,13 +6,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sync"
 )
 
-// Tool represents an installable tool with full task integration.
+// Tool represents an installable tool that implements Runnable.
 //
-// Tools use the same TaskAction signature as tasks, giving install functions
-// access to TaskContext for output, other tools, and all standard helpers.
+// Tools can be composed with Serial/Parallel just like tasks:
+//
+//	pocket.Serial(
+//	    pocket.Parallel(golangcilint.Tool, govulncheck.Tool),  // install in parallel
+//	    pocket.Parallel(lintTask, vulncheckTask),              // then run tasks
+//	)
+//
+// The install function has the same signature as task actions, giving it
+// full access to TaskContext for output and other tools.
 //
 // Example:
 //
@@ -32,9 +38,6 @@ type Tool struct {
 	version string
 	install TaskAction
 	config  *ToolConfig
-
-	once       sync.Once
-	installErr error
 }
 
 // ToolConfig describes how to find or create a tool's configuration file.
@@ -89,7 +92,6 @@ func (t *Tool) WithConfig(cfg ToolConfig) *Tool {
 		version: t.version,
 		install: t.install,
 		config:  &cfg,
-		// once and installErr are intentionally zero-valued (fresh)
 	}
 }
 
@@ -142,28 +144,48 @@ func (t *Tool) binaryPath() string {
 	return FromBinDir(BinaryName(t.name))
 }
 
-// Install ensures the tool is installed.
-// This is called automatically by Run and Command, but can be called
-// directly if you want to pre-install without running.
+// Run implements Runnable - installs the tool if needed.
 //
-// Installation is thread-safe: concurrent calls will only trigger one
-// install, with subsequent calls waiting for and reusing the result.
-func (t *Tool) Install(ctx context.Context, tc *TaskContext) error {
-	t.once.Do(func() {
-		t.installErr = t.install(ctx, tc)
-	})
-	return t.installErr
+// Tools can be composed with Serial/Parallel:
+//
+//	// Install tools in parallel, then run tasks
+//	pocket.Serial(
+//	    pocket.Parallel(golangcilint.Tool, govulncheck.Tool),
+//	    lintTask,
+//	)
+//
+// Deduplication is automatic: the same tool is only installed once per execution.
+func (t *Tool) Run(ctx context.Context, exec *Execution) error {
+	key := "tool:" + t.name + "@" + t.version
+	if done, err := exec.state.dedup.isDone(key); done {
+		return err
+	}
+
+	tc := &TaskContext{
+		Path:    ".",
+		Verbose: exec.Verbose(),
+		Out:     exec.Out,
+		exec:    exec,
+	}
+	err := t.install(ctx, tc)
+	exec.state.dedup.markDone(key, err)
+	return err
 }
 
-// Run installs the tool (if needed) and executes it with the given arguments.
-// Output is wired to the TaskContext's output writers for proper buffering.
+// Tasks implements Runnable - returns nil since tools aren't CLI-visible.
+func (t *Tool) Tasks() []*Task {
+	return nil
+}
+
+// Exec runs the tool binary with the given arguments.
+// Installs the tool first if needed.
 //
 // Example:
 //
 //	func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
-//	    return golangcilint.Tool.Run(ctx, tc, "run", "./...")
+//	    return golangcilint.Tool.Exec(ctx, tc, "run", "./...")
 //	}
-func (t *Tool) Run(ctx context.Context, tc *TaskContext, args ...string) error {
+func (t *Tool) Exec(ctx context.Context, tc *TaskContext, args ...string) error {
 	cmd, err := t.Command(ctx, tc, args...)
 	if err != nil {
 		return err
@@ -171,8 +193,8 @@ func (t *Tool) Run(ctx context.Context, tc *TaskContext, args ...string) error {
 	return cmd.Run()
 }
 
-// Command installs the tool (if needed) and returns an exec.Cmd.
-// The command has its output wired to the TaskContext's writers.
+// Command returns an exec.Cmd for the tool binary.
+// Installs the tool first if needed.
 //
 // Use this when you need to customize the command (e.g., set Dir) before running.
 //
@@ -185,7 +207,7 @@ func (t *Tool) Run(ctx context.Context, tc *TaskContext, args ...string) error {
 //	cmd.Dir = pocket.FromGitRoot(dir)
 //	return cmd.Run()
 func (t *Tool) Command(ctx context.Context, tc *TaskContext, args ...string) (*exec.Cmd, error) {
-	if err := t.Install(ctx, tc); err != nil {
+	if err := t.Run(ctx, tc.Execution()); err != nil {
 		return nil, fmt.Errorf("install %s: %w", t.name, err)
 	}
 	return tc.Command(ctx, t.binaryPath(), args...), nil

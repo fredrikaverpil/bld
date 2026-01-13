@@ -77,7 +77,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	}
 
 	absDir := pocket.FromGitRoot(tc.Path)
-	if err := stylua.Tool.Run(ctx, tc, "-f", configPath, absDir); err != nil {
+	if err := stylua.Tool.Exec(ctx, tc, "-f", configPath, absDir); err != nil {
 		return fmt.Errorf("stylua format failed in %s: %w", tc.Path, err)
 	}
 	return nil

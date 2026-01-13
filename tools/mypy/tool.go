@@ -22,7 +22,7 @@ const pythonVersion = "3.12"
 //
 // Example usage in a task action:
 //
-//	mypy.Tool.Run(ctx, tc, ".")
+//	mypy.Tool.Exec(ctx, tc, ".")
 var Tool = pocket.NewTool(name, version, install)
 
 func install(ctx context.Context, tc *pocket.TaskContext) error {

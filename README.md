@@ -118,20 +118,55 @@ var Config = pocket.Config{
 
 ### Tool management
 
-Pocket can download and cache tools in `.pocket/tools/`, so you don't need to
-rely on CI to install them. Here's a task that uses golangci-lint:
+Pocket downloads and caches tools in `.pocket/tools/`. Tools implement
+`Runnable`, so they compose with `Serial`/`Parallel` just like tasks.
+
+**Using a bundled tool:**
 
 ```go
 import "github.com/fredrikaverpil/pocket/tools/golangcilint"
 
 func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
-    return golangcilint.Tool.Run(ctx, tc, "run", "./...")
+    return golangcilint.Tool.Exec(ctx, tc, "run", "./...")
 }
 
 var lintTask = pocket.NewTask("lint", "run linter", lintAction)
 ```
 
-Tools are automatically downloaded on first use and cached for subsequent runs.
+**Creating a custom tool:**
+
+```go
+// .pocket/tools.go
+package main
+
+import (
+    "context"
+    "github.com/fredrikaverpil/pocket"
+)
+
+const myToolVersion = "1.0.0"
+
+var myTool = pocket.NewTool("mytool", myToolVersion, installMyTool)
+
+func installMyTool(ctx context.Context, tc *pocket.TaskContext) error {
+    tc.Out.Printf("Installing mytool %s...\n", myToolVersion)
+    // Option 1: Download binary from URL
+    return pocket.DownloadBinary(ctx, tc, "https://example.com/mytool.tar.gz", pocket.DownloadOpts{
+        DestDir: pocket.FromToolsDir("mytool", myToolVersion),
+        Format:  "tar.gz",
+        Symlink: true,
+    })
+    // Option 2: Go install
+    // return pocket.GoInstall(ctx, tc, "example.com/mytool", myToolVersion)
+}
+
+// Use in a task action
+func myAction(ctx context.Context, tc *pocket.TaskContext) error {
+    return myTool.Exec(ctx, tc, "--flag", "arg")
+}
+```
+
+Tools are installed on first use and cached for subsequent runs.
 
 ## Configuration
 
@@ -460,7 +495,7 @@ cmd := tc.Command(ctx, "go", "build", "./...")  // output wired to tc.Out
 cmd.Run()
 
 // Tools (auto-installed on first use, output wired to tc.Out)
-golangcilint.Tool.Run(ctx, tc, "run", "./...")
+golangcilint.Tool.Exec(ctx, tc, "run", "./...")
 
 // Detection (for Detectable interface)
 pocket.DetectByFile("go.mod")       // dirs containing file

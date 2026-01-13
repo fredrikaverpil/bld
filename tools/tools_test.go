@@ -32,19 +32,21 @@ var tools = []struct {
 }
 
 func TestTools(t *testing.T) {
-	// Create a minimal TaskContext for testing.
-	tc := &pocket.TaskContext{
-		Out: &pocket.Output{Stdout: os.Stdout, Stderr: os.Stderr},
-	}
+	// Create an Execution for testing tool installation.
+	out := &pocket.Output{Stdout: os.Stdout, Stderr: os.Stderr}
+	exec := pocket.NewExecution(out, false, ".")
+	tc := exec.TaskContext(".")
 
 	for _, tool := range tools {
 		t.Run(tool.name, func(t *testing.T) {
 			ctx := context.Background()
-			if err := tool.tool.Install(ctx, tc); err != nil {
+			// Install the tool (Tool implements Runnable).
+			if err := tool.tool.Run(ctx, exec); err != nil {
 				t.Fatalf("Install: %v", err)
 			}
-			if err := tool.tool.Run(ctx, tc, tool.versionArgs...); err != nil {
-				t.Fatalf("Run %v: %v", tool.versionArgs, err)
+			// Run the tool binary to verify it works.
+			if err := tool.tool.Exec(ctx, tc, tool.versionArgs...); err != nil {
+				t.Fatalf("Exec %v: %v", tool.versionArgs, err)
 			}
 		})
 	}

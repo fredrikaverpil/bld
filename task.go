@@ -150,6 +150,17 @@ func (tc *TaskContext) Execution() *Execution {
 	return tc.exec
 }
 
+// TaskContext creates a TaskContext for the given path.
+// This is useful for running tools outside of a Task action, such as in tests.
+func (e *Execution) TaskContext(path string) *TaskContext {
+	return &TaskContext{
+		Path:    path,
+		Verbose: e.Verbose(),
+		Out:     e.Out,
+		exec:    e,
+	}
+}
+
 // Command creates an exec.Cmd with output wired to this task's output writers.
 // This ensures command output is properly buffered when running in parallel.
 //

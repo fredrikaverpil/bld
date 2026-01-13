@@ -87,7 +87,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 	}
 
-	if err := ruff.Tool.Run(ctx, tc, "format", "--config", configPath, tc.Path); err != nil {
+	if err := ruff.Tool.Exec(ctx, tc, "format", "--config", configPath, tc.Path); err != nil {
 		return fmt.Errorf("ruff format failed in %s: %w", tc.Path, err)
 	}
 	return nil
@@ -116,7 +116,7 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 	}
 
-	if err := ruff.Tool.Run(ctx, tc, "check", "--config", configPath, tc.Path); err != nil {
+	if err := ruff.Tool.Exec(ctx, tc, "check", "--config", configPath, tc.Path); err != nil {
 		return fmt.Errorf("ruff check failed in %s: %w", tc.Path, err)
 	}
 	return nil
@@ -129,7 +129,7 @@ func TypecheckTask() *pocket.Task {
 
 // typecheckAction is the action for the py-typecheck task.
 func typecheckAction(ctx context.Context, tc *pocket.TaskContext) error {
-	if err := mypy.Tool.Run(ctx, tc, tc.Path); err != nil {
+	if err := mypy.Tool.Exec(ctx, tc, tc.Path); err != nil {
 		return fmt.Errorf("mypy failed in %s: %w", tc.Path, err)
 	}
 	return nil

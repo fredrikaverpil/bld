@@ -18,7 +18,7 @@ const pkg = "golang.org/x/vuln/cmd/govulncheck"
 //
 // Example usage in a task action:
 //
-//	govulncheck.Tool.Run(ctx, tc, "./...")
+//	govulncheck.Tool.Exec(ctx, tc, "./...")
 var Tool = pocket.NewTool(name, version, install)
 
 func install(ctx context.Context, tc *pocket.TaskContext) error {

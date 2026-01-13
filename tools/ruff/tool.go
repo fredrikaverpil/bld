@@ -27,7 +27,7 @@ var defaultConfig []byte
 // Example usage in a task action:
 //
 //	configPath, _ := ruff.Tool.ConfigPath()
-//	ruff.Tool.Run(ctx, tc, "check", "--config", configPath, ".")
+//	ruff.Tool.Exec(ctx, tc, "check", "--config", configPath, ".")
 var Tool = pocket.NewTool(name, version, install).
 	WithConfig(pocket.ToolConfig{
 		UserFiles:   []string{"ruff.toml", ".ruff.toml", "pyproject.toml"},

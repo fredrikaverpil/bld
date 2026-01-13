@@ -19,7 +19,7 @@ const version = "0.7.13"
 //
 // Example usage in a task action:
 //
-//	uv.Tool.Run(ctx, tc, "venv", ".")
+//	uv.Tool.Exec(ctx, tc, "venv", ".")
 var Tool = pocket.NewTool(name, version, install)
 
 // CreateVenv creates a Python virtual environment at the specified path.
@@ -30,17 +30,17 @@ func CreateVenv(ctx context.Context, tc *pocket.TaskContext, venvPath, pythonVer
 		args = append(args, "--python", pythonVersion)
 	}
 	args = append(args, venvPath)
-	return Tool.Run(ctx, tc, args...)
+	return Tool.Exec(ctx, tc, args...)
 }
 
 // PipInstall installs a package into a virtual environment.
 func PipInstall(ctx context.Context, tc *pocket.TaskContext, venvPath, pkg string) error {
-	return Tool.Run(ctx, tc, "pip", "install", "--python", venvPython(venvPath), pkg)
+	return Tool.Exec(ctx, tc, "pip", "install", "--python", venvPython(venvPath), pkg)
 }
 
 // PipInstallRequirements installs packages from a requirements.txt file.
 func PipInstallRequirements(ctx context.Context, tc *pocket.TaskContext, venvPath, requirementsPath string) error {
-	return Tool.Run(ctx, tc, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
+	return Tool.Exec(ctx, tc, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
 }
 
 // venvPython returns the path to the Python executable in a venv.

@@ -23,7 +23,7 @@ var defaultConfig []byte
 // Example usage in a task action:
 //
 //	configPath, _ := golangcilint.Tool.ConfigPath()
-//	golangcilint.Tool.Run(ctx, tc, "run", "-c", configPath, "./...")
+//	golangcilint.Tool.Exec(ctx, tc, "run", "-c", configPath, "./...")
 var Tool = pocket.NewTool(name, version, install).
 	WithConfig(pocket.ToolConfig{
 		UserFiles:   []string{".golangci.yml", ".golangci.yaml"},

@@ -26,7 +26,7 @@ var requirements []byte
 //
 // Example usage in a task action:
 //
-//	mdformat.Tool.Run(ctx, tc, "--wrap", "80", ".")
+//	mdformat.Tool.Exec(ctx, tc, "--wrap", "80", ".")
 var Tool = pocket.NewTool(name, versionHash(), install)
 
 // versionHash creates a unique hash based on requirements and Python version.

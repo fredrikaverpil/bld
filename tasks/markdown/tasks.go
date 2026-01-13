@@ -36,7 +36,7 @@ func FormatTask() *pocket.Task {
 // formatAction is the action for the md-format task.
 func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	absDir := pocket.FromGitRoot(tc.Path)
-	if err := mdformat.Tool.Run(ctx, tc, "--number", "--wrap", "80", absDir); err != nil {
+	if err := mdformat.Tool.Exec(ctx, tc, "--number", "--wrap", "80", absDir); err != nil {
 		return fmt.Errorf("mdformat failed in %s: %w", tc.Path, err)
 	}
 	return nil
