@@ -355,9 +355,7 @@ func TestPaths_Skip_InPath(t *testing.T) {
 	task1 := &Task{
 		Name: "task1",
 		Action: func(_ context.Context, tc *TaskContext) error {
-			for _, p := range tc.Paths {
-				executedPaths = append(executedPaths, "task1:"+p)
-			}
+			executedPaths = append(executedPaths, "task1:"+tc.Path)
 			return nil
 		},
 	}
@@ -397,7 +395,7 @@ func TestPaths_Skip_InMultiplePaths(t *testing.T) {
 	task1 := &Task{
 		Name: "task1",
 		Action: func(_ context.Context, tc *TaskContext) error {
-			executedPaths = append(executedPaths, tc.Paths...)
+			executedPaths = append(executedPaths, tc.Path)
 			return nil
 		},
 	}

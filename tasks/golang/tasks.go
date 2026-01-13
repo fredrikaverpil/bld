@@ -96,35 +96,34 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
 	}
-	return tc.ForEachPath(ctx, func(dir string) error {
-		absDir := pocket.FromGitRoot(dir)
 
-		needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, absDir)
-		if err != nil {
-			return err
-		}
-		if !needsFormat {
-			tc.Out.Println("No files in need of formatting.")
-			return nil
-		}
+	absDir := pocket.FromGitRoot(tc.Path)
 
-		// Show diff in verbose mode.
-		if tc.Verbose {
-			tc.Out.Printf("%s", diffOutput)
-		}
-
-		// Now actually format.
-		cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "./...")
-		if err != nil {
-			return fmt.Errorf("prepare golangci-lint: %w", err)
-		}
-		cmd.Dir = absDir
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("golangci-lint fmt failed in %s: %w", dir, err)
-		}
-		tc.Out.Println("Formatted files.")
+	needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, absDir)
+	if err != nil {
+		return err
+	}
+	if !needsFormat {
+		tc.Out.Println("No files in need of formatting.")
 		return nil
-	})
+	}
+
+	// Show diff in verbose mode.
+	if tc.Verbose {
+		tc.Out.Printf("%s", diffOutput)
+	}
+
+	// Now actually format.
+	cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "./...")
+	if err != nil {
+		return fmt.Errorf("prepare golangci-lint: %w", err)
+	}
+	cmd.Dir = absDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("golangci-lint fmt failed in %s: %w", tc.Path, err)
+	}
+	tc.Out.Println("Formatted files.")
+	return nil
 }
 
 // formatCheck runs golangci-lint fmt --diff to check if formatting is needed.
@@ -167,17 +166,16 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
 	}
-	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := golangcilint.Tool.Command(ctx, tc, "run", "--allow-parallel-runners", "-c", configPath, "./...")
-		if err != nil {
-			return fmt.Errorf("prepare golangci-lint: %w", err)
-		}
-		cmd.Dir = pocket.FromGitRoot(dir)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("golangci-lint failed in %s: %w", dir, err)
-		}
-		return nil
-	})
+
+	cmd, err := golangcilint.Tool.Command(ctx, tc, "run", "--allow-parallel-runners", "-c", configPath, "./...")
+	if err != nil {
+		return fmt.Errorf("prepare golangci-lint: %w", err)
+	}
+	cmd.Dir = pocket.FromGitRoot(tc.Path)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("golangci-lint failed in %s: %w", tc.Path, err)
+	}
+	return nil
 }
 
 // TestOptions configures the go-test task.
@@ -195,33 +193,32 @@ func TestTask() *pocket.Task {
 // testAction is the action for the go-test task.
 func testAction(ctx context.Context, tc *pocket.TaskContext) error {
 	opts := pocket.GetOptions[TestOptions](tc)
-	return tc.ForEachPath(ctx, func(dir string) error {
-		args := []string{"test"}
-		if tc.Verbose {
-			args = append(args, "-v")
-		}
-		if !opts.SkipRace {
-			args = append(args, "-race")
-		}
-		if !opts.SkipCoverage {
-			// Name coverage file based on directory to avoid overwrites.
-			coverName := "coverage.out"
-			if dir != "." {
-				// Replace path separators with dashes for valid filename.
-				coverName = "coverage-" + strings.ReplaceAll(dir, "/", "-") + ".out"
-			}
-			coverFile := pocket.FromGitRoot(coverName)
-			args = append(args, "-coverprofile="+coverFile)
-		}
-		args = append(args, "./...")
 
-		cmd := tc.Command(ctx, "go", args...)
-		cmd.Dir = pocket.FromGitRoot(dir)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("go test failed in %s: %w", dir, err)
+	args := []string{"test"}
+	if tc.Verbose {
+		args = append(args, "-v")
+	}
+	if !opts.SkipRace {
+		args = append(args, "-race")
+	}
+	if !opts.SkipCoverage {
+		// Name coverage file based on directory to avoid overwrites.
+		coverName := "coverage.out"
+		if tc.Path != "." {
+			// Replace path separators with dashes for valid filename.
+			coverName = "coverage-" + strings.ReplaceAll(tc.Path, "/", "-") + ".out"
 		}
-		return nil
-	})
+		coverFile := pocket.FromGitRoot(coverName)
+		args = append(args, "-coverprofile="+coverFile)
+	}
+	args = append(args, "./...")
+
+	cmd := tc.Command(ctx, "go", args...)
+	cmd.Dir = pocket.FromGitRoot(tc.Path)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("go test failed in %s: %w", tc.Path, err)
+	}
+	return nil
 }
 
 // VulncheckTask returns a task that runs govulncheck.
@@ -231,15 +228,13 @@ func VulncheckTask() *pocket.Task {
 
 // vulncheckAction is the action for the go-vulncheck task.
 func vulncheckAction(ctx context.Context, tc *pocket.TaskContext) error {
-	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := govulncheck.Tool.Command(ctx, tc, "./...")
-		if err != nil {
-			return fmt.Errorf("prepare govulncheck: %w", err)
-		}
-		cmd.Dir = pocket.FromGitRoot(dir)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("govulncheck failed in %s: %w", dir, err)
-		}
-		return nil
-	})
+	cmd, err := govulncheck.Tool.Command(ctx, tc, "./...")
+	if err != nil {
+		return fmt.Errorf("prepare govulncheck: %w", err)
+	}
+	cmd.Dir = pocket.FromGitRoot(tc.Path)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("govulncheck failed in %s: %w", tc.Path, err)
+	}
+	return nil
 }

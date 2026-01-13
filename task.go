@@ -125,12 +125,12 @@ func (e *Execution) printTaskHeader(taskName string, skippedPaths []string) {
 }
 
 // TaskContext provides runtime data for task actions.
-// It is created by Task.Run() with resolved paths and options.
+// It is created by Task.Run() and passed to the action once per path.
 type TaskContext struct {
 	// Task-specific data
-	Paths   []string // resolved paths for this task
-	Verbose bool     // verbose mode (copied for convenience)
-	Out     *Output  // output writers
+	Path    string  // the path for this invocation (relative to git root)
+	Verbose bool    // verbose mode (copied for convenience)
+	Out     *Output // output writers
 
 	// Parsed options (access via GetOptions[T])
 	options any
@@ -148,24 +148,6 @@ func (tc *TaskContext) CWD() string {
 // This is useful when a task action needs to orchestrate other tasks.
 func (tc *TaskContext) Execution() *Execution {
 	return tc.exec
-}
-
-// ForEachPath executes fn for each path in the context.
-// This is a convenience helper for the common pattern of iterating over paths.
-// Iteration stops early if the context is cancelled (e.g., another parallel task failed).
-func (tc *TaskContext) ForEachPath(ctx context.Context, fn func(dir string) error) error {
-	for _, dir := range tc.Paths {
-		// Check for cancellation before each iteration.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		if err := fn(dir); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Command creates an exec.Cmd with output wired to this task's output writers.
@@ -318,7 +300,7 @@ func (t *Task) AsBuiltin() *Task {
 	return &cp
 }
 
-// Run executes the task's action exactly once per execution.
+// Run executes the task's action once per path.
 // Implements the Runnable interface.
 // Skip rules from Execution are checked:
 // - Global skip (no paths): task doesn't run at all
@@ -345,27 +327,52 @@ func (t *Task) Run(ctx context.Context, exec *Execution) error {
 		return nil
 	}
 
-	// Print task header.
-	exec.printTaskHeader(t.Name, skipped)
-
-	// Parse typed options.
+	// Parse typed options (shared across all path iterations).
 	opts, err := parseOptionsFromCLI(t.Options, exec.setup.args[t.Name])
 	if err != nil {
 		dedup.markDone(t.Name, fmt.Errorf("parse options: %w", err))
 		return err
 	}
 
-	// Build TaskContext and run the action.
-	tc := &TaskContext{
-		Paths:   paths,
-		Verbose: exec.Verbose(),
-		Out:     exec.Out,
-		options: opts,
-		exec:    exec,
+	// Iterate over paths, calling the action for each.
+	for i, path := range paths {
+		// Check for cancellation before each iteration.
+		select {
+		case <-ctx.Done():
+			dedup.markDone(t.Name, ctx.Err())
+			return ctx.Err()
+		default:
+		}
+
+		// Print header (show path when multiple paths).
+		if len(paths) > 1 {
+			if i == 0 && len(skipped) > 0 {
+				fmt.Fprintf(exec.Out.Stdout, ":: %s [%s] (skipped in: %s)\n",
+					t.Name, path, strings.Join(skipped, ", "))
+			} else {
+				fmt.Fprintf(exec.Out.Stdout, ":: %s [%s]\n", t.Name, path)
+			}
+		} else if i == 0 {
+			exec.printTaskHeader(t.Name, skipped)
+		}
+
+		// Build TaskContext for this path.
+		tc := &TaskContext{
+			Path:    path,
+			Verbose: exec.Verbose(),
+			Out:     exec.Out,
+			options: opts,
+			exec:    exec,
+		}
+
+		if err := t.Action(ctx, tc); err != nil {
+			dedup.markDone(t.Name, err)
+			return err
+		}
 	}
-	err = t.Action(ctx, tc)
-	dedup.markDone(t.Name, err)
-	return err
+
+	dedup.markDone(t.Name, nil)
+	return nil
 }
 
 // Tasks returns this task as a slice (implements Runnable interface).

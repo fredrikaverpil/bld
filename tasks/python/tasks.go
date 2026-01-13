@@ -86,28 +86,27 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 			return fmt.Errorf("get ruff config: %w", err)
 		}
 	}
-	return tc.ForEachPath(ctx, func(dir string) error {
-		needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, dir)
-		if err != nil {
-			return err
-		}
-		if !needsFormat {
-			tc.Out.Println("No files in need of formatting.")
-			return nil
-		}
 
-		// Show diff in verbose mode.
-		if tc.Verbose && len(diffOutput) > 0 {
-			tc.Out.Printf("%s", diffOutput)
-		}
-
-		// Now actually format.
-		if err := ruff.Tool.Run(ctx, tc, "format", "--config", configPath, dir); err != nil {
-			return fmt.Errorf("ruff format failed in %s: %w", dir, err)
-		}
-		tc.Out.Println("Formatted files.")
+	needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, tc.Path)
+	if err != nil {
+		return err
+	}
+	if !needsFormat {
+		tc.Out.Println("No files in need of formatting.")
 		return nil
-	})
+	}
+
+	// Show diff in verbose mode.
+	if tc.Verbose && len(diffOutput) > 0 {
+		tc.Out.Printf("%s", diffOutput)
+	}
+
+	// Now actually format.
+	if err := ruff.Tool.Run(ctx, tc, "format", "--config", configPath, tc.Path); err != nil {
+		return fmt.Errorf("ruff format failed in %s: %w", tc.Path, err)
+	}
+	tc.Out.Println("Formatted files.")
+	return nil
 }
 
 // formatCheck runs ruff format --check --diff to see if formatting is needed.
@@ -149,12 +148,11 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 			return fmt.Errorf("get ruff config: %w", err)
 		}
 	}
-	return tc.ForEachPath(ctx, func(dir string) error {
-		if err := ruff.Tool.Run(ctx, tc, "check", "--config", configPath, dir); err != nil {
-			return fmt.Errorf("ruff check failed in %s: %w", dir, err)
-		}
-		return nil
-	})
+
+	if err := ruff.Tool.Run(ctx, tc, "check", "--config", configPath, tc.Path); err != nil {
+		return fmt.Errorf("ruff check failed in %s: %w", tc.Path, err)
+	}
+	return nil
 }
 
 // TypecheckTask returns a task that type-checks Python files using mypy.
@@ -164,10 +162,8 @@ func TypecheckTask() *pocket.Task {
 
 // typecheckAction is the action for the py-typecheck task.
 func typecheckAction(ctx context.Context, tc *pocket.TaskContext) error {
-	return tc.ForEachPath(ctx, func(dir string) error {
-		if err := mypy.Tool.Run(ctx, tc, dir); err != nil {
-			return fmt.Errorf("mypy failed in %s: %w", dir, err)
-		}
-		return nil
-	})
+	if err := mypy.Tool.Run(ctx, tc, tc.Path); err != nil {
+		return fmt.Errorf("mypy failed in %s: %w", tc.Path, err)
+	}
+	return nil
 }

@@ -93,13 +93,14 @@ func TestDetect_FindsGoModules(t *testing.T) {
 // the correct paths when executed, ensuring sibling files would be included.
 func TestLintTask_PathsPassedCorrectly(t *testing.T) {
 	// Create a custom task to capture what paths would be passed.
+	// With single-path execution, task is called once per path.
 	var capturedPaths []string
 
 	task := pocket.NewTask(
 		"test-capture",
 		"capture paths for testing",
-		func(_ context.Context, rc *pocket.TaskContext) error {
-			capturedPaths = rc.Paths
+		func(_ context.Context, tc *pocket.TaskContext) error {
+			capturedPaths = append(capturedPaths, tc.Path)
 			return nil
 		},
 	)
