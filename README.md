@@ -385,13 +385,11 @@ task.AsBuiltin()               // mark as built-in task
 // Create a task group (runs tasks in parallel by default)
 group := pocket.NewTaskGroup(formatTask, lintTask, testTask)
 
-// Configure execution order
-group.RunWith(func(ctx context.Context) error {
-    if err := pocket.Serial(formatTask, lintTask).Run(ctx); err != nil {
-        return err
-    }
-    return testTask.Run(ctx)
-})
+// Configure execution order using Serial/Parallel composition
+group.RunWith(pocket.Serial(formatTask, lintTask, testTask))
+
+// Mixed serial and parallel
+group.RunWith(pocket.Serial(formatTask, pocket.Parallel(lintTask, testTask)))
 
 // Configure auto-detection
 group.DetectByFile("go.mod")           // detect by marker files

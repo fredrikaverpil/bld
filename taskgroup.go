@@ -19,17 +19,12 @@ import "context"
 //	    test, vulncheck := TestTask(), VulncheckTask()
 //
 //	    return pocket.NewTaskGroup(format, lint, test, vulncheck).
-//	        RunWith(func(ctx context.Context, exec *pocket.Execution) error {
-//	            if err := pocket.Serial(format, lint).Run(ctx, exec); err != nil {
-//	                return err
-//	            }
-//	            return pocket.Parallel(test, vulncheck).Run(ctx, exec)
-//	        }).
+//	        RunWith(pocket.Serial(format, lint, pocket.Parallel(test, vulncheck))).
 //	        DetectBy(pocket.DetectByFile("go.mod"))
 //	}
 type TaskGroup struct {
 	tasks    []*Task
-	runFn    func(context.Context, *Execution) error
+	runner   Runnable
 	detectFn func() []string
 }
 
@@ -41,13 +36,14 @@ func NewTaskGroup(tasks ...*Task) *TaskGroup {
 	}
 }
 
-// RunWith sets a custom execution function for the task group.
+// RunWith sets a custom execution order for the task group.
 // If not called, tasks run in parallel by default.
 //
-// The function receives context and Execution, and should orchestrate task execution
-// using Serial() and Parallel() as needed.
-func (g *TaskGroup) RunWith(fn func(context.Context, *Execution) error) *TaskGroup {
-	g.runFn = fn
+// Use Serial() and Parallel() to compose the execution order:
+//
+//	group.RunWith(pocket.Serial(format, lint, pocket.Parallel(test, vulncheck)))
+func (g *TaskGroup) RunWith(r Runnable) *TaskGroup {
+	g.runner = r
 	return g
 }
 
@@ -65,11 +61,11 @@ func (g *TaskGroup) DetectBy(fn func() []string) *TaskGroup {
 }
 
 // Run executes the task group.
-// If RunWith was called, uses the custom function.
+// If RunWith was called, uses the custom Runnable.
 // Otherwise, runs all tasks in parallel.
 func (g *TaskGroup) Run(ctx context.Context, exec *Execution) error {
-	if g.runFn != nil {
-		return g.runFn(ctx, exec)
+	if g.runner != nil {
+		return g.runner.Run(ctx, exec)
 	}
 	// Default: run all tasks in parallel.
 	runnables := make([]Runnable, len(g.tasks))

@@ -50,14 +50,7 @@ func Tasks(opts ...TasksOption) pocket.Runnable {
 	typecheck := TypecheckTask()
 
 	return pocket.NewTaskGroup(format, lint, typecheck).
-		RunWith(func(ctx context.Context, exec *pocket.Execution) error {
-			// Format must run first.
-			if err := format.Run(ctx, exec); err != nil {
-				return err
-			}
-			// Lint and typecheck can run in parallel.
-			return pocket.Parallel(lint, typecheck).Run(ctx, exec)
-		}).
+		RunWith(pocket.Serial(format, pocket.Parallel(lint, typecheck))).
 		DetectByFile("pyproject.toml", "setup.py", "setup.cfg")
 }
 

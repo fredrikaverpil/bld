@@ -60,14 +60,7 @@ func Tasks(opts ...TasksOption) pocket.Runnable {
 	vulncheck := VulncheckTask()
 
 	return pocket.NewTaskGroup(format, lint, test, vulncheck).
-		RunWith(func(ctx context.Context, exec *pocket.Execution) error {
-			// Format and lint must run serially (lint after format).
-			if err := pocket.Serial(format, lint).Run(ctx, exec); err != nil {
-				return err
-			}
-			// Test and vulncheck can run in parallel.
-			return pocket.Parallel(test, vulncheck).Run(ctx, exec)
-		}).
+		RunWith(pocket.Serial(format, lint, pocket.Parallel(test, vulncheck))).
 		DetectByFile("go.mod")
 }
 
