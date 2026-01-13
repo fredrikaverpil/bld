@@ -125,7 +125,7 @@ rely on CI to install them. Here's a task that uses golangci-lint:
 import "github.com/fredrikaverpil/pocket/tools/golangcilint"
 
 func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
-    return tc.Tool(golangcilint.T).Run(ctx, "run", "./...")
+    return golangcilint.Tool.Run(ctx, tc, "run", "./...")
 }
 
 var lintTask = pocket.NewTask("lint", "run linter", lintAction)
@@ -448,8 +448,8 @@ tc.Out.Stderr                      // io.Writer for stderr
 cmd := tc.Command(ctx, "go", "build", "./...")  // output wired to tc.Out
 cmd.Run()
 
-// Tools (in task actions, use tc.Tool for proper output handling)
-tc.Tool(golangcilint.T).Run(ctx, "run", "./...")  // output wired to tc.Out
+// Tools (auto-installed on first use, output wired to tc.Out)
+golangcilint.Tool.Run(ctx, tc, "run", "./...")
 
 // Detection (for Detectable interface)
 pocket.DetectByFile("go.mod")       // dirs containing file

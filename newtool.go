@@ -1,0 +1,192 @@
+package pocket
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"sync"
+)
+
+// Tool represents an installable tool with full task integration.
+//
+// Tools use the same TaskAction signature as tasks, giving install functions
+// access to TaskContext for output, other tools, and all standard helpers.
+//
+// Example:
+//
+//	var Tool = pocket.NewTool("golangci-lint", version, install).
+//	    WithConfig(pocket.ToolConfig{
+//	        UserFiles:   []string{".golangci.yml"},
+//	        DefaultFile: "golangci.yml",
+//	        DefaultData: defaultConfig,
+//	    })
+//
+//	func install(ctx context.Context, tc *pocket.TaskContext) error {
+//	    tc.Out.Printf("Installing golangci-lint %s...\n", version)
+//	    return pocket.DownloadBinary(ctx, tc, url, opts)
+//	}
+type Tool struct {
+	name    string
+	version string
+	install TaskAction
+	config  *ToolConfig
+
+	once       sync.Once
+	installErr error
+}
+
+// ToolConfig describes how to find or create a tool's configuration file.
+type ToolConfig struct {
+	// UserFiles are filenames to search for in the repo root.
+	// Checked in order; first match wins.
+	UserFiles []string
+	// DefaultFile is the filename for the bundled default config,
+	// written to .pocket/tools/<name>/ if no user config exists.
+	DefaultFile string
+	// DefaultData is the bundled default configuration content.
+	DefaultData []byte
+}
+
+// NewTool creates a tool definition.
+//
+// The install function has the same signature as task actions, giving it
+// full access to TaskContext for output and running other tools.
+//
+// Example:
+//
+//	// renovate: datasource=github-releases depName=golangci/golangci-lint
+//	const version = "2.7.1"
+//
+//	var Tool = pocket.NewTool("golangci-lint", version, install)
+//
+//	func install(ctx context.Context, tc *pocket.TaskContext) error {
+//	    tc.Out.Printf("Installing %s...\n", Tool.Name())
+//	    // ... installation logic
+//	}
+func NewTool(name, version string, install TaskAction) *Tool {
+	if name == "" {
+		panic("pocket.NewTool: name is required")
+	}
+	if version == "" {
+		panic("pocket.NewTool: version is required")
+	}
+	if install == nil {
+		panic("pocket.NewTool: install function is required")
+	}
+	return &Tool{
+		name:    name,
+		version: version,
+		install: install,
+	}
+}
+
+// WithConfig returns a new Tool with configuration file handling.
+func (t *Tool) WithConfig(cfg ToolConfig) *Tool {
+	return &Tool{
+		name:    t.name,
+		version: t.version,
+		install: t.install,
+		config:  &cfg,
+		// once and installErr are intentionally zero-valued (fresh)
+	}
+}
+
+// Name returns the tool's binary name (without .exe extension).
+func (t *Tool) Name() string {
+	return t.name
+}
+
+// Version returns the tool's version string.
+func (t *Tool) Version() string {
+	return t.version
+}
+
+// ConfigPath returns the path to the tool's config file.
+// It checks for user config files in the repo root first,
+// then falls back to writing the bundled default config.
+//
+// Returns empty string and no error if the tool has no config.
+func (t *Tool) ConfigPath() (string, error) {
+	if t.config == nil {
+		return "", nil
+	}
+
+	// Check for user config in repo root.
+	for _, configName := range t.config.UserFiles {
+		repoConfig := FromGitRoot(configName)
+		if _, err := os.Stat(repoConfig); err == nil {
+			return repoConfig, nil
+		}
+	}
+
+	// Write bundled config to .pocket/tools/<name>/<default-file>.
+	configDir := FromToolsDir(t.name)
+	configPath := filepath.Join(configDir, t.config.DefaultFile)
+
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
+			return "", fmt.Errorf("create config dir: %w", err)
+		}
+		if err := os.WriteFile(configPath, t.config.DefaultData, 0o644); err != nil {
+			return "", fmt.Errorf("write default config: %w", err)
+		}
+	}
+
+	return configPath, nil
+}
+
+// binaryPath returns the full path to the tool's binary in .pocket/bin/.
+func (t *Tool) binaryPath() string {
+	return FromBinDir(BinaryName(t.name))
+}
+
+// Install ensures the tool is installed.
+// This is called automatically by Run and Command, but can be called
+// directly if you want to pre-install without running.
+//
+// Installation is thread-safe: concurrent calls will only trigger one
+// install, with subsequent calls waiting for and reusing the result.
+func (t *Tool) Install(ctx context.Context, tc *TaskContext) error {
+	t.once.Do(func() {
+		t.installErr = t.install(ctx, tc)
+	})
+	return t.installErr
+}
+
+// Run installs the tool (if needed) and executes it with the given arguments.
+// Output is wired to the TaskContext's output writers for proper buffering.
+//
+// Example:
+//
+//	func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
+//	    return golangcilint.Tool.Run(ctx, tc, "run", "./...")
+//	}
+func (t *Tool) Run(ctx context.Context, tc *TaskContext, args ...string) error {
+	cmd, err := t.Command(ctx, tc, args...)
+	if err != nil {
+		return err
+	}
+	return cmd.Run()
+}
+
+// Command installs the tool (if needed) and returns an exec.Cmd.
+// The command has its output wired to the TaskContext's writers.
+//
+// Use this when you need to customize the command (e.g., set Dir) before running.
+//
+// Example:
+//
+//	cmd, err := golangcilint.Tool.Command(ctx, tc, "run", "./...")
+//	if err != nil {
+//	    return err
+//	}
+//	cmd.Dir = pocket.FromGitRoot(dir)
+//	return cmd.Run()
+func (t *Tool) Command(ctx context.Context, tc *TaskContext, args ...string) (*exec.Cmd, error) {
+	if err := t.Install(ctx, tc); err != nil {
+		return nil, fmt.Errorf("install %s: %w", t.name, err)
+	}
+	return tc.Command(ctx, t.binaryPath(), args...), nil
+}

@@ -88,7 +88,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	configPath := opts.LintConfig
 	if configPath == "" {
 		var err error
-		configPath, err = golangcilint.ConfigPath()
+		configPath, err = golangcilint.Tool.ConfigPath()
 		if err != nil {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
@@ -96,7 +96,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
 		absDir := pocket.FromGitRoot(dir)
 
-		needsFormat, diffOutput, err := formatCheck(ctx, configPath, absDir)
+		needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, absDir)
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		cmd, err := tc.Tool(golangcilint.T).Command(ctx, "fmt", "-c", configPath, "./...")
+		cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare golangci-lint: %w", err)
 		}
@@ -126,8 +126,12 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 
 // formatCheck runs golangci-lint fmt --diff to check if formatting is needed.
 // Returns true if files need formatting, along with the diff output.
-func formatCheck(ctx context.Context, configPath, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := golangcilint.T.Command(ctx, "fmt", "-c", configPath, "--diff", "./...")
+func formatCheck(
+	ctx context.Context,
+	tc *pocket.TaskContext,
+	configPath, dir string,
+) (needsFormat bool, output []byte, err error) {
+	cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "--diff", "./...")
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare golangci-lint: %w", err)
 	}
@@ -155,13 +159,13 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 	configPath := opts.LintConfig
 	if configPath == "" {
 		var err error
-		configPath, err = golangcilint.ConfigPath()
+		configPath, err = golangcilint.Tool.ConfigPath()
 		if err != nil {
 			return fmt.Errorf("get golangci-lint config: %w", err)
 		}
 	}
 	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := tc.Tool(golangcilint.T).Command(ctx, "run", "--allow-parallel-runners", "-c", configPath, "./...")
+		cmd, err := golangcilint.Tool.Command(ctx, tc, "run", "--allow-parallel-runners", "-c", configPath, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare golangci-lint: %w", err)
 		}
@@ -225,7 +229,7 @@ func VulncheckTask() *pocket.Task {
 // vulncheckAction is the action for the go-vulncheck task.
 func vulncheckAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
-		cmd, err := tc.Tool(govulncheck.T).Command(ctx, "./...")
+		cmd, err := govulncheck.Tool.Command(ctx, tc, "./...")
 		if err != nil {
 			return fmt.Errorf("prepare govulncheck: %w", err)
 		}

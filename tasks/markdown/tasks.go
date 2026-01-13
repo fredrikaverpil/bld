@@ -27,7 +27,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
 		absDir := pocket.FromGitRoot(dir)
 
-		needsFormat, checkOutput, err := formatCheck(ctx, absDir)
+		needsFormat, checkOutput, err := formatCheck(ctx, tc, absDir)
 		if err != nil {
 			return err
 		}
@@ -42,7 +42,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		if err := tc.Tool(mdformat.T).Run(ctx, "--number", "--wrap", "80", absDir); err != nil {
+		if err := mdformat.Tool.Run(ctx, tc, "--number", "--wrap", "80", absDir); err != nil {
 			return fmt.Errorf("mdformat failed in %s: %w", dir, err)
 		}
 		tc.Out.Println("Formatted files.")
@@ -52,8 +52,8 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 
 // formatCheck runs mdformat --check to see if formatting is needed.
 // Returns true if files need formatting, along with the check output.
-func formatCheck(ctx context.Context, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := mdformat.T.Command(ctx, "--check", "--number", "--wrap", "80", dir)
+func formatCheck(ctx context.Context, tc *pocket.TaskContext, dir string) (needsFormat bool, output []byte, err error) {
+	cmd, err := mdformat.Tool.Command(ctx, tc, "--check", "--number", "--wrap", "80", dir)
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare mdformat: %w", err)
 	}

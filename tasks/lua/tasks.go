@@ -59,7 +59,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	configPath := opts.StyluaConfig
 	if configPath == "" {
 		var err error
-		configPath, err = stylua.ConfigPath()
+		configPath, err = stylua.Tool.ConfigPath()
 		if err != nil {
 			return fmt.Errorf("get stylua config: %w", err)
 		}
@@ -67,7 +67,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
 		absDir := pocket.FromGitRoot(dir)
 
-		needsFormat, checkOutput, err := formatCheck(ctx, configPath, absDir)
+		needsFormat, checkOutput, err := formatCheck(ctx, tc, configPath, absDir)
 		if err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		if err := tc.Tool(stylua.T).Run(ctx, "-f", configPath, absDir); err != nil {
+		if err := stylua.Tool.Run(ctx, tc, "-f", configPath, absDir); err != nil {
 			return fmt.Errorf("stylua format failed in %s: %w", dir, err)
 		}
 		tc.Out.Println("Formatted files.")
@@ -92,8 +92,12 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 
 // formatCheck runs stylua --check to see if formatting is needed.
 // Returns true if files need formatting, along with the check output.
-func formatCheck(ctx context.Context, configPath, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := stylua.T.Command(ctx, "--check", "-f", configPath, dir)
+func formatCheck(
+	ctx context.Context,
+	tc *pocket.TaskContext,
+	configPath, dir string,
+) (needsFormat bool, output []byte, err error) {
+	cmd, err := stylua.Tool.Command(ctx, tc, "--check", "-f", configPath, dir)
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare stylua: %w", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tool"
 	"github.com/fredrikaverpil/pocket/tools/uv"
 )
 
@@ -19,32 +18,36 @@ const version = "1.19.1"
 // pythonVersion specifies the Python version for the virtual environment.
 const pythonVersion = "3.12"
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(mypy.T).Run(ctx, ".").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+// Tool is the mypy tool.
+//
+// Example usage in a task action:
+//
+//	mypy.Tool.Run(ctx, tc, ".")
+var Tool = pocket.NewTool(name, version, install)
 
-// Prepare ensures mypy is installed.
-func Prepare(ctx context.Context) error {
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s %s...\n", name, version)
+
 	venvDir := pocket.FromToolsDir(name, version)
-	binary := tool.VenvBinaryPath(venvDir, name)
+	binary := pocket.VenvBinaryPath(venvDir, name)
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {
-		_, err := tool.CreateSymlink(binary)
+		_, err := pocket.CreateSymlink(binary)
 		return err
 	}
 
-	// Create virtual environment.
-	if err := uv.CreateVenv(ctx, venvDir, pythonVersion); err != nil {
+	// Create virtual environment (uv auto-installs if needed).
+	if err := uv.CreateVenv(ctx, tc, venvDir, pythonVersion); err != nil {
 		return err
 	}
 
 	// Install the package.
-	if err := uv.PipInstall(ctx, venvDir, name+"=="+version); err != nil {
+	if err := uv.PipInstall(ctx, tc, venvDir, name+"=="+version); err != nil {
 		return err
 	}
 
 	// Create symlink to .pocket/bin/.
-	_, err := tool.CreateSymlink(binary)
+	_, err := pocket.CreateSymlink(binary)
 	return err
 }

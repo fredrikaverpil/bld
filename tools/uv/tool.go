@@ -8,7 +8,6 @@ import (
 	"runtime"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tool"
 )
 
 const name = "uv"
@@ -16,29 +15,32 @@ const name = "uv"
 // renovate: datasource=github-releases depName=astral-sh/uv
 const version = "0.7.13"
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(uv.T).Run(ctx, "venv", ".").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+// Tool is the uv tool.
+//
+// Example usage in a task action:
+//
+//	uv.Tool.Run(ctx, tc, "venv", ".")
+var Tool = pocket.NewTool(name, version, install)
 
 // CreateVenv creates a Python virtual environment at the specified path.
 // If pythonVersion is empty, uv uses the default Python available.
-func CreateVenv(ctx context.Context, venvPath, pythonVersion string) error {
+func CreateVenv(ctx context.Context, tc *pocket.TaskContext, venvPath, pythonVersion string) error {
 	args := []string{"venv"}
 	if pythonVersion != "" {
 		args = append(args, "--python", pythonVersion)
 	}
 	args = append(args, venvPath)
-	return T.Run(ctx, args...)
+	return Tool.Run(ctx, tc, args...)
 }
 
 // PipInstall installs a package into a virtual environment.
-func PipInstall(ctx context.Context, venvPath, pkg string) error {
-	return T.Run(ctx, "pip", "install", "--python", venvPython(venvPath), pkg)
+func PipInstall(ctx context.Context, tc *pocket.TaskContext, venvPath, pkg string) error {
+	return Tool.Run(ctx, tc, "pip", "install", "--python", venvPython(venvPath), pkg)
 }
 
 // PipInstallRequirements installs packages from a requirements.txt file.
-func PipInstallRequirements(ctx context.Context, venvPath, requirementsPath string) error {
-	return T.Run(ctx, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
+func PipInstallRequirements(ctx context.Context, tc *pocket.TaskContext, venvPath, requirementsPath string) error {
+	return Tool.Run(ctx, tc, "pip", "install", "--python", venvPython(venvPath), "-r", requirementsPath)
 }
 
 // venvPython returns the path to the Python executable in a venv.
@@ -50,44 +52,32 @@ func venvPython(venvPath string) string {
 	return filepath.Join(venvPath, "bin", "python")
 }
 
-// Prepare ensures uv is installed.
-func Prepare(ctx context.Context) error {
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s %s...\n", name, version)
+
 	binDir := pocket.FromToolsDir(name, version, "bin")
 	binaryName := pocket.BinaryName(name)
-	binary := filepath.Join(binDir, binaryName)
 
-	// Windows uses .zip, others use .tar.gz.
-	var binURL string
-	var opts []tool.Opt
+	var format string
 	if runtime.GOOS == "windows" {
-		binURL = fmt.Sprintf(
-			"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.zip",
-			version,
-			platformArch(),
-		)
-		opts = []tool.Opt{
-			tool.WithDestinationDir(binDir),
-			tool.WithUnzip(),
-			tool.WithExtractFiles(binaryName),
-			tool.WithSkipIfFileExists(binary),
-			tool.WithSymlink(binary),
-		}
+		format = "zip"
 	} else {
-		binURL = fmt.Sprintf(
-			"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.tar.gz",
-			version,
-			platformArch(),
-		)
-		opts = []tool.Opt{
-			tool.WithDestinationDir(binDir),
-			tool.WithUntarGz(),
-			tool.WithExtractFiles(binaryName),
-			tool.WithSkipIfFileExists(binary),
-			tool.WithSymlink(binary),
-		}
+		format = "tar.gz"
 	}
 
-	return tool.FromRemote(ctx, binURL, opts...)
+	url := fmt.Sprintf(
+		"https://github.com/astral-sh/uv/releases/download/%s/uv-%s.%s",
+		version,
+		platformArch(),
+		format,
+	)
+
+	return pocket.DownloadBinary(ctx, tc, url, pocket.DownloadOpts{
+		DestDir:      binDir,
+		Format:       format,
+		ExtractFiles: []string{binaryName},
+		Symlink:      true,
+	})
 }
 
 func platformArch() string {

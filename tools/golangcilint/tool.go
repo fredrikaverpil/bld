@@ -5,11 +5,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"path/filepath"
 	"runtime"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tool"
 )
 
 const name = "golangci-lint"
@@ -20,64 +18,47 @@ const version = "2.7.1"
 //go:embed golangci.yml
 var defaultConfig []byte
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(golangcilint.T).Run(ctx, "run", "./...").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+// Tool is the golangci-lint tool.
+//
+// Example usage in a task action:
+//
+//	configPath, _ := golangcilint.Tool.ConfigPath()
+//	golangcilint.Tool.Run(ctx, tc, "run", "-c", configPath, "./...")
+var Tool = pocket.NewTool(name, version, install).
+	WithConfig(pocket.ToolConfig{
+		UserFiles:   []string{".golangci.yml", ".golangci.yaml"},
+		DefaultFile: "golangci.yml",
+		DefaultData: defaultConfig,
+	})
 
-var configSpec = tool.ConfigSpec{
-	ToolName:          name,
-	UserConfigNames:   []string{".golangci.yml", ".golangci.yaml"},
-	DefaultConfigName: "golangci.yml",
-	DefaultConfig:     defaultConfig,
-}
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s %s...\n", name, version)
 
-// ConfigPath returns the path to the golangci-lint config file.
-// It checks for .golangci.yml or .golangci.yaml in the repo root first,
-// then falls back to the bundled default config.
-var ConfigPath = configSpec.Path
-
-// Prepare ensures golangci-lint is installed.
-func Prepare(ctx context.Context) error {
 	binDir := pocket.FromToolsDir(name, version, "bin")
 	binaryName := pocket.BinaryName(name)
-	binary := filepath.Join(binDir, binaryName)
 
-	// Windows uses .zip, others use .tar.gz.
-	var binURL string
-	var opts []tool.Opt
+	var format string
 	if runtime.GOOS == "windows" {
-		binURL = fmt.Sprintf(
-			"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.zip",
-			version,
-			version,
-			runtime.GOOS,
-			archName(),
-		)
-		opts = []tool.Opt{
-			tool.WithDestinationDir(binDir),
-			tool.WithUnzip(),
-			tool.WithExtractFiles(binaryName),
-			tool.WithSkipIfFileExists(binary),
-			tool.WithSymlink(binary),
-		}
+		format = "zip"
 	} else {
-		binURL = fmt.Sprintf(
-			"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.tar.gz",
-			version,
-			version,
-			runtime.GOOS,
-			archName(),
-		)
-		opts = []tool.Opt{
-			tool.WithDestinationDir(binDir),
-			tool.WithUntarGz(),
-			tool.WithExtractFiles(binaryName),
-			tool.WithSkipIfFileExists(binary),
-			tool.WithSymlink(binary),
-		}
+		format = "tar.gz"
 	}
 
-	return tool.FromRemote(ctx, binURL, opts...)
+	url := fmt.Sprintf(
+		"https://github.com/golangci/golangci-lint/releases/download/v%s/golangci-lint-%s-%s-%s.%s",
+		version,
+		version,
+		runtime.GOOS,
+		archName(),
+		format,
+	)
+
+	return pocket.DownloadBinary(ctx, tc, url, pocket.DownloadOpts{
+		DestDir:      binDir,
+		Format:       format,
+		ExtractFiles: []string{binaryName},
+		Symlink:      true,
+	})
 }
 
 func archName() string {

@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tool"
 	"github.com/fredrikaverpil/pocket/tools/uv"
 )
 
@@ -23,9 +22,12 @@ const pythonVersion = "3.13"
 //go:embed requirements.txt
 var requirements []byte
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(mdformat.T).Run(ctx, ".").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+// Tool is the mdformat tool.
+//
+// Example usage in a task action:
+//
+//	mdformat.Tool.Run(ctx, tc, "--wrap", "80", ".")
+var Tool = pocket.NewTool(name, versionHash(), install)
 
 // versionHash creates a unique hash based on requirements and Python version.
 // This ensures the venv is recreated when dependencies or Python version change.
@@ -36,21 +38,22 @@ func versionHash() string {
 	return hex.EncodeToString(h.Sum(nil))[:12]
 }
 
-// Prepare ensures mdformat is installed.
-func Prepare(ctx context.Context) error {
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s...\n", name)
+
 	// Use hash-based versioning: .pocket/tools/mdformat/<hash>/
 	venvDir := pocket.FromToolsDir(name, versionHash())
-	binary := tool.VenvBinaryPath(venvDir, name)
+	binary := pocket.VenvBinaryPath(venvDir, name)
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {
 		// Ensure symlink/copy exists.
-		_, err := tool.CreateSymlink(binary)
+		_, err := pocket.CreateSymlink(binary)
 		return err
 	}
 
 	// Create virtual environment with Python 3.13+ for --exclude support.
-	if err := uv.CreateVenv(ctx, venvDir, pythonVersion); err != nil {
+	if err := uv.CreateVenv(ctx, tc, venvDir, pythonVersion); err != nil {
 		return err
 	}
 
@@ -61,11 +64,11 @@ func Prepare(ctx context.Context) error {
 	}
 
 	// Install from requirements.txt.
-	if err := uv.PipInstallRequirements(ctx, venvDir, reqPath); err != nil {
+	if err := uv.PipInstallRequirements(ctx, tc, venvDir, reqPath); err != nil {
 		return err
 	}
 
 	// Create symlink (or copy on Windows) to .pocket/bin/.
-	_, err := tool.CreateSymlink(binary)
+	_, err := pocket.CreateSymlink(binary)
 	return err
 }

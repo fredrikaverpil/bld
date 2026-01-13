@@ -5,11 +5,9 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"path/filepath"
 	"runtime"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tool"
 )
 
 const name = "stylua"
@@ -20,43 +18,38 @@ const version = "2.3.1"
 //go:embed stylua.toml
 var defaultConfig []byte
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(stylua.T).Run(ctx, ".").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+// Tool is the stylua tool.
+//
+// Example usage in a task action:
+//
+//	configPath, _ := stylua.Tool.ConfigPath()
+//	stylua.Tool.Run(ctx, tc, "-f", configPath, ".")
+var Tool = pocket.NewTool(name, version, install).
+	WithConfig(pocket.ToolConfig{
+		UserFiles:   []string{"stylua.toml", ".stylua.toml"},
+		DefaultFile: "stylua.toml",
+		DefaultData: defaultConfig,
+	})
 
-var configSpec = tool.ConfigSpec{
-	ToolName:          name,
-	UserConfigNames:   []string{"stylua.toml", ".stylua.toml"},
-	DefaultConfigName: "stylua.toml",
-	DefaultConfig:     defaultConfig,
-}
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s %s...\n", name, version)
 
-// ConfigPath returns the path to the stylua config file.
-// It checks for stylua.toml in the repo root first, then falls back
-// to the bundled default config.
-var ConfigPath = configSpec.Path
-
-// Prepare ensures stylua is installed.
-func Prepare(ctx context.Context) error {
 	binDir := pocket.FromToolsDir(name, version, "bin")
 	binaryName := pocket.BinaryName(name)
-	binary := filepath.Join(binDir, binaryName)
 
-	binURL := fmt.Sprintf(
+	url := fmt.Sprintf(
 		"https://github.com/JohnnyMorganz/StyLua/releases/download/v%s/stylua-%s-%s.zip",
 		version,
 		osName(),
 		archName(),
 	)
 
-	return tool.FromRemote(
-		ctx,
-		binURL,
-		tool.WithDestinationDir(binDir),
-		tool.WithUnzip(),
-		tool.WithSkipIfFileExists(binary),
-		tool.WithSymlink(binary),
-	)
+	return pocket.DownloadBinary(ctx, tc, url, pocket.DownloadOpts{
+		DestDir:      binDir,
+		Format:       "zip",
+		ExtractFiles: []string{binaryName},
+		Symlink:      true,
+	})
 }
 
 func osName() string {

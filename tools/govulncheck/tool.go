@@ -4,7 +4,7 @@ package govulncheck
 import (
 	"context"
 
-	"github.com/fredrikaverpil/pocket/tool"
+	"github.com/fredrikaverpil/pocket"
 )
 
 const name = "govulncheck"
@@ -12,12 +12,17 @@ const name = "govulncheck"
 // renovate: datasource=go depName=golang.org/x/vuln
 const version = "v1.1.4"
 
-// T is the tool instance for use with TaskContext.Tool().
-// Example: tc.Tool(govulncheck.T).Run(ctx, "./...").
-var T = &tool.Tool{Name: name, Prepare: Prepare}
+const pkg = "golang.org/x/vuln/cmd/govulncheck"
 
-// Prepare ensures govulncheck is installed.
-func Prepare(ctx context.Context) error {
-	_, err := tool.GoInstall(ctx, "golang.org/x/vuln/cmd/govulncheck", version)
+// Tool is the govulncheck tool.
+//
+// Example usage in a task action:
+//
+//	govulncheck.Tool.Run(ctx, tc, "./...")
+var Tool = pocket.NewTool(name, version, install)
+
+func install(ctx context.Context, tc *pocket.TaskContext) error {
+	tc.Out.Printf("Installing %s %s...\n", name, version)
+	_, err := pocket.GoInstall(ctx, tc, pkg, version)
 	return err
 }

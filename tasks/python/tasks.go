@@ -78,13 +78,13 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 	configPath := opts.RuffConfig
 	if configPath == "" {
 		var err error
-		configPath, err = ruff.ConfigPath()
+		configPath, err = ruff.Tool.ConfigPath()
 		if err != nil {
 			return fmt.Errorf("get ruff config: %w", err)
 		}
 	}
 	return tc.ForEachPath(ctx, func(dir string) error {
-		needsFormat, diffOutput, err := formatCheck(ctx, configPath, dir)
+		needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, dir)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 
 		// Now actually format.
-		if err := tc.Tool(ruff.T).Run(ctx, "format", "--config", configPath, dir); err != nil {
+		if err := ruff.Tool.Run(ctx, tc, "format", "--config", configPath, dir); err != nil {
 			return fmt.Errorf("ruff format failed in %s: %w", dir, err)
 		}
 		tc.Out.Println("Formatted files.")
@@ -109,8 +109,12 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 
 // formatCheck runs ruff format --check --diff to see if formatting is needed.
 // Returns true if files need formatting, along with the diff output.
-func formatCheck(ctx context.Context, configPath, dir string) (needsFormat bool, output []byte, err error) {
-	cmd, err := ruff.T.Command(ctx, "format", "--check", "--diff", "--config", configPath, dir)
+func formatCheck(
+	ctx context.Context,
+	tc *pocket.TaskContext,
+	configPath, dir string,
+) (needsFormat bool, output []byte, err error) {
+	cmd, err := ruff.Tool.Command(ctx, tc, "format", "--check", "--diff", "--config", configPath, dir)
 	if err != nil {
 		return false, nil, fmt.Errorf("prepare ruff: %w", err)
 	}
@@ -137,13 +141,13 @@ func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
 	configPath := opts.RuffConfig
 	if configPath == "" {
 		var err error
-		configPath, err = ruff.ConfigPath()
+		configPath, err = ruff.Tool.ConfigPath()
 		if err != nil {
 			return fmt.Errorf("get ruff config: %w", err)
 		}
 	}
 	return tc.ForEachPath(ctx, func(dir string) error {
-		if err := tc.Tool(ruff.T).Run(ctx, "check", "--config", configPath, dir); err != nil {
+		if err := ruff.Tool.Run(ctx, tc, "check", "--config", configPath, dir); err != nil {
 			return fmt.Errorf("ruff check failed in %s: %w", dir, err)
 		}
 		return nil
@@ -158,7 +162,7 @@ func TypecheckTask() *pocket.Task {
 // typecheckAction is the action for the py-typecheck task.
 func typecheckAction(ctx context.Context, tc *pocket.TaskContext) error {
 	return tc.ForEachPath(ctx, func(dir string) error {
-		if err := tc.Tool(mypy.T).Run(ctx, dir); err != nil {
+		if err := mypy.Tool.Run(ctx, tc, dir); err != nil {
 			return fmt.Errorf("mypy failed in %s: %w", dir, err)
 		}
 		return nil
