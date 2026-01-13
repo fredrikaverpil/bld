@@ -87,43 +87,10 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 	}
 
-	needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, tc.Path)
-	if err != nil {
-		return err
-	}
-	if !needsFormat {
-		tc.Out.Println("No files in need of formatting.")
-		return nil
-	}
-
-	// Show diff in verbose mode.
-	if tc.Verbose && len(diffOutput) > 0 {
-		tc.Out.Printf("%s", diffOutput)
-	}
-
-	// Now actually format.
 	if err := ruff.Tool.Run(ctx, tc, "format", "--config", configPath, tc.Path); err != nil {
 		return fmt.Errorf("ruff format failed in %s: %w", tc.Path, err)
 	}
-	tc.Out.Println("Formatted files.")
 	return nil
-}
-
-// formatCheck runs ruff format --check --diff to see if formatting is needed.
-// Returns true if files need formatting, along with the diff output.
-func formatCheck(
-	ctx context.Context,
-	tc *pocket.TaskContext,
-	configPath, dir string,
-) (needsFormat bool, output []byte, err error) {
-	cmd, err := ruff.Tool.Command(ctx, tc, "format", "--check", "--diff", "--config", configPath, dir)
-	if err != nil {
-		return false, nil, fmt.Errorf("prepare ruff: %w", err)
-	}
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	output, checkErr := cmd.CombinedOutput()
-	return checkErr != nil, output, nil
 }
 
 // LintOptions configures the py-lint task.

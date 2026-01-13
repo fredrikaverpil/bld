@@ -99,51 +99,15 @@ func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
 		}
 	}
 
-	absDir := pocket.FromGitRoot(tc.Path)
-
-	needsFormat, diffOutput, err := formatCheck(ctx, tc, configPath, absDir)
-	if err != nil {
-		return err
-	}
-	if !needsFormat {
-		tc.Out.Println("No files in need of formatting.")
-		return nil
-	}
-
-	// Show diff in verbose mode.
-	if tc.Verbose {
-		tc.Out.Printf("%s", diffOutput)
-	}
-
-	// Now actually format.
 	cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "./...")
 	if err != nil {
 		return fmt.Errorf("prepare golangci-lint: %w", err)
 	}
-	cmd.Dir = absDir
+	cmd.Dir = pocket.FromGitRoot(tc.Path)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("golangci-lint fmt failed in %s: %w", tc.Path, err)
 	}
-	tc.Out.Println("Formatted files.")
 	return nil
-}
-
-// formatCheck runs golangci-lint fmt --diff to check if formatting is needed.
-// Returns true if files need formatting, along with the diff output.
-func formatCheck(
-	ctx context.Context,
-	tc *pocket.TaskContext,
-	configPath, dir string,
-) (needsFormat bool, output []byte, err error) {
-	cmd, err := golangcilint.Tool.Command(ctx, tc, "fmt", "-c", configPath, "--diff", "./...")
-	if err != nil {
-		return false, nil, fmt.Errorf("prepare golangci-lint: %w", err)
-	}
-	cmd.Dir = dir
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	output, _ = cmd.CombinedOutput()
-	return len(output) > 0, output, nil
 }
 
 // LintOptions configures the go-lint task.
