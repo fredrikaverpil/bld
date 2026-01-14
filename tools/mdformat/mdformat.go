@@ -1,0 +1,75 @@
+// Package mdformat provides mdformat (Markdown formatter) tool integration.
+// mdformat is installed via uv into a virtual environment with plugins.
+package mdformat
+
+import (
+	"context"
+	"crypto/sha256"
+	_ "embed"
+	"encoding/hex"
+	"os"
+	"path/filepath"
+
+	"github.com/fredrikaverpil/pocket"
+	"github.com/fredrikaverpil/pocket/tools/uv"
+)
+
+// Python 3.13+ required by mdformat v1 for --exclude support.
+const pythonVersion = "3.13"
+
+//go:embed requirements.txt
+var requirements []byte
+
+// Version creates a unique hash based on requirements and Python version.
+// This ensures the venv is recreated when dependencies or Python version change.
+func Version() string {
+	h := sha256.New()
+	h.Write(requirements)
+	h.Write([]byte(pythonVersion))
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// Install ensures mdformat is available.
+// This is a hidden dependency used by Exec.
+var Install = pocket.Func("install:mdformat", "install mdformat", install).Hidden()
+
+func install(ctx context.Context) error {
+	// Use hash-based versioning: .pocket/tools/mdformat/<hash>/
+	venvDir := pocket.FromToolsDir("mdformat", Version())
+	binary := pocket.VenvBinaryPath(venvDir, "mdformat")
+
+	// Skip if already installed.
+	if _, err := os.Stat(binary); err == nil {
+		// Ensure symlink/copy exists.
+		_, err := pocket.CreateSymlink(binary)
+		return err
+	}
+
+	pocket.Printf(ctx, "Installing mdformat...\n")
+
+	// Create virtual environment with Python 3.13+ for --exclude support.
+	if err := uv.CreateVenv(ctx, venvDir, pythonVersion); err != nil {
+		return err
+	}
+
+	// Write requirements.txt to venv dir.
+	reqPath := filepath.Join(venvDir, "requirements.txt")
+	if err := os.WriteFile(reqPath, requirements, 0o644); err != nil {
+		return err
+	}
+
+	// Install from requirements.txt.
+	if err := uv.PipInstallRequirements(ctx, venvDir, reqPath); err != nil {
+		return err
+	}
+
+	// Create symlink (or copy on Windows) to .pocket/bin/.
+	_, err := pocket.CreateSymlink(binary)
+	return err
+}
+
+// Exec runs mdformat with the given arguments.
+func Exec(ctx context.Context, args ...string) error {
+	pocket.Serial(ctx, Install)
+	return pocket.Exec(ctx, "mdformat", args...)
+}

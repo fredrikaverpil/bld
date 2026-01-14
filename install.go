@@ -33,7 +33,7 @@ func InstallGo(ctx context.Context, pkg, version string) error {
 	// Check if already installed.
 	if _, err := os.Stat(binaryPath); err == nil {
 		// Already installed, ensure symlink exists.
-		if _, err := createSymlink(binaryPath); err != nil {
+		if _, err := CreateSymlink(binaryPath); err != nil {
 			return err
 		}
 		return nil
@@ -59,7 +59,7 @@ func InstallGo(ctx context.Context, pkg, version string) error {
 	}
 
 	// Create symlink.
-	if _, err := createSymlink(binaryPath); err != nil {
+	if _, err := CreateSymlink(binaryPath); err != nil {
 		return err
 	}
 
@@ -163,10 +163,18 @@ func isGoVersion(s string) bool {
 	return true
 }
 
-// createSymlink creates a symlink in .pocket/bin/ pointing to the given binary.
+// VenvBinaryPath returns the cross-platform path to a binary in a Python venv.
+func VenvBinaryPath(venvDir, name string) string {
+	if runtime.GOOS == Windows {
+		return filepath.Join(venvDir, "Scripts", name+".exe")
+	}
+	return filepath.Join(venvDir, "bin", name)
+}
+
+// CreateSymlink creates a symlink in .pocket/bin/ pointing to the given binary.
 // On Windows, it copies the file instead since symlinks require admin privileges.
 // Returns the path to the symlink (or copy on Windows).
-func createSymlink(binaryPath string) (string, error) {
+func CreateSymlink(binaryPath string) (string, error) {
 	binDir := FromBinDir()
 	if err := os.MkdirAll(binDir, 0o755); err != nil {
 		return "", fmt.Errorf("create bin dir: %w", err)

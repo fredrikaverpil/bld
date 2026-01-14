@@ -1,5 +1,3 @@
-// Package markdown provides Markdown formatting tasks.
-// This is a "task" package - it orchestrates tools to do work.
 package markdown
 
 import (
@@ -10,31 +8,14 @@ import (
 	"github.com/fredrikaverpil/pocket/tools/prettier"
 )
 
-// Format formats Markdown files using prettier.
-var Format = pocket.Func("md-format", "format Markdown files", format)
-
 // FormatOptions configures markdown formatting.
 type FormatOptions struct {
-	Check bool // check only, don't write
+	Check bool `arg:"check" usage:"check only, don't write"`
 }
 
-// Workflow returns all markdown tasks composed as a Runnable.
-// Use this with pocket.Paths().DetectBy() for auto-detection.
-//
-// Example:
-//
-//	pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect())
-func Workflow() pocket.Runnable {
-	return Format
-}
-
-// Detect returns a detection function for Markdown projects.
-// Returns repository root since markdown files are typically scattered.
-func Detect() func() []string {
-	return func() []string {
-		return []string{"."}
-	}
-}
+// Format formats Markdown files using prettier.
+var Format = pocket.Func("md-format", "format Markdown files", format).
+	With(FormatOptions{})
 
 func format(ctx context.Context) error {
 	opts := pocket.Options[FormatOptions](ctx)

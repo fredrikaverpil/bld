@@ -208,3 +208,20 @@ func (tc *TaskContext) Command(ctx context.Context, name string, args ...string)
 	cmd.Stderr = tc.Out.Stderr
 	return cmd
 }
+
+// TestContext creates a context suitable for testing.
+// It sets up an execContext with the given output and working directory ".".
+//
+// Example:
+//
+//	func TestMyTask(t *testing.T) {
+//	    out := pocket.StdOutput()
+//	    ctx := pocket.TestContext(out)
+//	    if err := myTask(ctx); err != nil {
+//	        t.Fatal(err)
+//	    }
+//	}
+func TestContext(out *Output) context.Context {
+	ec := newExecContext(out, ".", false)
+	return withExecContext(context.Background(), ec)
+}
