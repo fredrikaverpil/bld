@@ -61,8 +61,41 @@ func RunConfig(cfg Config) {
 	// Collect built-in tasks (generate and update need Config).
 	builtinFuncs := builtinTasks(&cfg)
 
+	// Validate no duplicate function names.
+	if err := validateNoDuplicateFuncs(allFuncs, builtinFuncs); err != nil {
+		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
+		os.Exit(1)
+	}
+
 	// Call the CLI main function.
 	Main(allFuncs, allFunc, nil, pathMappings, autoRunNames, builtinFuncs)
+}
+
+// validateNoDuplicateFuncs checks that no two functions have the same name.
+// Returns an error listing all duplicates found.
+func validateNoDuplicateFuncs(funcs, builtinFuncs []*FuncDef) error {
+	seen := make(map[string]bool)
+	var duplicates []string
+
+	// Check user functions.
+	for _, f := range funcs {
+		if seen[f.name] {
+			duplicates = append(duplicates, f.name)
+		}
+		seen[f.name] = true
+	}
+
+	// Check built-in functions don't conflict with user functions.
+	for _, f := range builtinFuncs {
+		if seen[f.name] {
+			duplicates = append(duplicates, f.name+" (conflicts with builtin)")
+		}
+	}
+
+	if len(duplicates) > 0 {
+		return fmt.Errorf("duplicate function names: %s", strings.Join(duplicates, ", "))
+	}
+	return nil
 }
 
 // builtinTasks returns the built-in tasks that are always available.
