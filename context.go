@@ -103,6 +103,16 @@ func Printf(ctx context.Context, format string, args ...any) {
 	fmt.Fprintf(ec.out.Stdout, format, args...)
 }
 
+// Println writes a line to stdout.
+//
+// Example:
+//
+//	pocket.Println(ctx, "Done")
+func Println(ctx context.Context, args ...any) {
+	ec := getExecContext(ctx)
+	fmt.Fprintln(ec.out.Stdout, args...)
+}
+
 // Errorf writes formatted output to stderr.
 func Errorf(ctx context.Context, format string, args ...any) {
 	ec := getExecContext(ctx)
