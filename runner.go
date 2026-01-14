@@ -118,11 +118,14 @@ func builtinTasks(cfg *Config) []*FuncDef {
 			verbose := Verbose(ctx)
 			pocketDir := FromPocketDir()
 
-			// Update pocket dependency
+			// Update pocket dependency with GOPROXY=direct to bypass proxy cache.
 			if verbose {
 				Println(ctx, "Updating github.com/fredrikaverpil/pocket@latest")
 			}
-			if err := ExecIn(ctx, pocketDir, "go", "get", "-u", "github.com/fredrikaverpil/pocket@latest"); err != nil {
+			cmd := Command(ctx, "go", "get", "-u", "github.com/fredrikaverpil/pocket@latest")
+			cmd.Dir = pocketDir
+			cmd.Env = append(cmd.Env, "GOPROXY=direct")
+			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("go get -u: %w", err)
 			}
 
