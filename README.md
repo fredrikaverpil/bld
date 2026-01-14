@@ -55,19 +55,25 @@ var Config = pocket.Config{
 var Hello = pocket.Func("hello", "say hello", hello)
 
 func hello(ctx context.Context) error {
+    if pocket.Verbose(ctx) {
+        pocket.Println(ctx, "Running hello function...")
+    }
     pocket.Println(ctx, "Hello from pocket!")
     return nil
 }
 ```
 
 ```bash
-./pok -h      # list functions
-./pok hello   # run function
+./pok -h        # list functions
+./pok hello     # run function
+./pok hello -h  # show help for function (options, usage)
+./pok -v hello  # run with verbose output
 ```
 
 ### Composition
 
-Use `Serial()` and `Parallel()` to control execution order:
+Create multiple functions and compose them in `AutoRun` with `Serial()` and
+`Parallel()` for controlled execution order:
 
 ```go
 var Config = pocket.Config{
@@ -81,6 +87,8 @@ var Config = pocket.Config{
     ),
 }
 ```
+
+Running `./pok` without arguments executes the entire `AutoRun` tree.
 
 ### Dependencies
 
@@ -151,108 +159,67 @@ pocket.Parallel(ctx, fn1, fn2)  // run dependencies concurrently
 
 ### Tools vs Tasks
 
-Pocket conceptually distinguishes between **tools** (provide capabilities) and
-**tasks** (do work). Here's how they build on each other:
+Pocket conceptually distinguishes between **tools** (installers) and **tasks**
+(runners). Tools are responsible for downloading and installing binaries; tasks
+use those binaries to do work.
 
-#### 1. Runtime Tool
+#### 1. Tool Package
 
-A runtime tool ensures a dependency (often a binary) is available. It only
-exports a hidden `Install` function:
+A tool package ensures a binary is available. It exports:
+
+- `Name` - the binary name (used with `pocket.Exec`)
+- `Install` - a hidden function that downloads/installs the binary
+- `Config` (optional) - configuration file lookup settings
 
 ```go
-// tools/bun/bun.go
-package bun
+// tools/ruff/ruff.go
+package ruff
 
-var Install = pocket.Func("install:bun", "ensure bun available", install).Hidden()
+const Name = "ruff"
+const Version = "0.14.0"
+
+var Install = pocket.Func("install:ruff", "install ruff", install).Hidden()
+
+var Config = pocket.ToolConfig{
+    UserFiles:   []string{"ruff.toml", ".ruff.toml", "pyproject.toml"},
+    DefaultFile: "ruff.toml",
+    DefaultData: defaultConfig,
+}
 
 func install(ctx context.Context) error {
-    // Install bun (skipped for this example)
-
-    // Check if bun is in PATH
-    if _, err := exec.LookPath("bun"); err != nil {
-        return fmt.Errorf("bun not found - install from https://bun.sh")
-    }
-    return nil
+    // Download and install ruff to .pocket/bin/
+    // ...
 }
 ```
 
-#### 2. Action Tool
+#### 2. Task Package
 
-An action tool does something useful. It depends on a runtime tool and exports
-`Install` (hidden), an action function (visible), and an `Exec()` helper:
-
-```go
-// tools/prettier/prettier.go
-package prettier
-
-const Version = "3.4.2"
-
-// Hidden - ensures prettier is available
-var Install = pocket.Func("install:prettier", "install prettier", install).Hidden()
-
-func install(ctx context.Context) error {
-    pocket.Serial(ctx, bun.Install)  // Depend on bun
-    return nil
-}
-
-// Visible - can be used directly in config
-var Format = pocket.Func("prettier", "format with prettier", format)
-
-func format(ctx context.Context) error {
-    return Exec(ctx, "--write", ".")
-}
-
-// Exec runs prettier with any arguments - for programmatic use
-func Exec(ctx context.Context, args ...string) error {
-    pocket.Serial(ctx, Install)
-    return pocket.Exec(ctx, "bunx", "prettier@"+Version, args...)
-}
-```
-
-#### 3. Task Package
-
-A task package provides related functions. Individual functions defined with
-`pocket.Func()` are **tasks**. The `Workflow()` function composes these tasks
-into a **workflow** using `Serial`/`Parallel`, and `Detect()` enables
-auto-discovery:
+A task package provides related functions that use tools:
 
 ```go
-// tasks/golang/golang.go
-package golang
+// tasks/python/lint.go
+package python
 
-var Format = pocket.Func("go-format", "format Go code", format)
-var Lint = pocket.Func("go-lint", "lint Go code", lint)
-var Test = pocket.Func("go-test", "run tests", test)
-var Vulncheck = pocket.Func("go-vulncheck", "check vulnerabilities", vulncheck)
-
-func format(ctx context.Context) error {
-    return pocket.Exec(ctx, "go", "fmt", "./...")
-}
+var Lint = pocket.Func("py-lint", "lint Python files", lint)
 
 func lint(ctx context.Context) error {
-    return golangcilint.Exec(ctx, "run", "--fix", "./...")
+    pocket.Serial(ctx, ruff.Install)  // ensure tool is installed
+    return pocket.Exec(ctx, ruff.Name, "check", ".")  // run via Name constant
 }
+```
 
-func test(ctx context.Context) error {
-    return pocket.Exec(ctx, "go", "test", "./...")
-}
+The `Workflow()` function composes tasks, and `Detect()` enables auto-discovery:
 
-func vulncheck(ctx context.Context) error {
-    return govulncheck.Exec(ctx, "./...")
-}
+```go
+// tasks/python/workflow.go
+package python
 
-// Workflow returns all Go tasks composed - no ctx means composition mode
 func Workflow() pocket.Runnable {
-    return pocket.Serial(
-        Format,                           // mutates files
-        Lint,                             // mutates files (--fix)
-        pocket.Parallel(Test, Vulncheck), // read-only - safe to parallelize
-    )
+    return pocket.Serial(Format, Lint)
 }
 
-// Detect finds directories containing go.mod
 func Detect() func() []string {
-    return func() []string { return pocket.DetectByFile("go.mod") }
+    return func() []string { return pocket.DetectByFile("pyproject.toml") }
 }
 ```
 
@@ -263,46 +230,12 @@ func Detect() func() []string {
 > Functions that mutate files (formatters, code generators) should run in serial
 > before other functions read those files.
 
-#### Customization
-
-Pocket ships with pre-configured tools and tasks that are opinionated - they
-include default configurations, version pinning, and sensible defaults. However,
-Pocket is designed for customization:
-
-- **Project-level**: Define your own tools and tasks in `.pocket/*.go`
-- **Organization-level**: Create a "Pocket platform" (like this repo, but
-  without the Pocket internals) - a Go module that uses Pocket's APIs to define
-  your organization's standard tools, tasks, and configurations
-
-A platform module depends on Pocket and exports its own tools and tasks:
-
-```go
-// github.com/myorg/platform/tasks/golang/golang.go
-package golang
-
-import "github.com/fredrikaverpil/pocket"
-
-var Format = pocket.Func("go-format", "format Go code", format)
-// ... your organization's opinionated Go tasks
-```
-
-Then projects import from your platform instead of Pocket's bundled tasks:
-
-```go
-import "github.com/myorg/platform/tasks/golang"
-
-var Config = pocket.Config{
-    AutoRun: pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()),
-}
-```
-
 #### Summary
 
-| Type             | Purpose            | Exports                            | Example          |
-| ---------------- | ------------------ | ---------------------------------- | ---------------- |
-| **Runtime Tool** | Provides a runtime | `Install` (hidden)                 | bun, uv          |
-| **Action Tool**  | Does something     | `Install` + action func + `Exec()` | prettier, ruff   |
-| **Task Package** | Orchestrates tools | Tasks + `Workflow()` + `Detect()`  | markdown, golang |
+| Type     | Purpose         | Exports                              | Example            |
+| -------- | --------------- | ------------------------------------ | ------------------ |
+| **Tool** | Installs binary | `Name`, `Install`, optional `Config` | ruff, golangcilint |
+| **Task** | Uses tools      | FuncDefs + `Workflow()` + `Detect()` | python, golang     |
 
 ### Config Usage
 
@@ -315,9 +248,6 @@ var Config = pocket.Config{
         // Use task collections with auto-detection
         pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()),
         pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect()),
-
-        // Or use action tools directly
-        pocket.Paths(prettier.Format).In("docs"),
     ),
 
     // ManualRun requires explicit ./pok <name>
@@ -349,7 +279,7 @@ pocket.Paths(golang.Workflow()).DetectBy(golang.Detect())
 pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).Except("vendor")
 
 // Skip specific functions in specific paths
-pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).Skip(golang.GoTest, "docs")
+pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).Skip(golang.Test, "docs")
 ```
 
 ## Options
