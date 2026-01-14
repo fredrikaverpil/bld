@@ -4,8 +4,8 @@
 
 package main
 
-import "github.com/fredrikaverpil/pocket/tasks"
+import "github.com/fredrikaverpil/pocket"
 
 func main() {
-	tasks.Run(Config)
+	pocket.RunConfig(Config)
 }
