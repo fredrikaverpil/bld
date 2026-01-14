@@ -7,10 +7,12 @@ import (
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tools/basedpyright"
+	"github.com/fredrikaverpil/pocket/tools/bun"
 	"github.com/fredrikaverpil/pocket/tools/golangcilint"
 	"github.com/fredrikaverpil/pocket/tools/govulncheck"
 	"github.com/fredrikaverpil/pocket/tools/mdformat"
 	"github.com/fredrikaverpil/pocket/tools/mypy"
+	"github.com/fredrikaverpil/pocket/tools/prettier"
 	"github.com/fredrikaverpil/pocket/tools/ruff"
 	"github.com/fredrikaverpil/pocket/tools/stylua"
 	"github.com/fredrikaverpil/pocket/tools/uv"
@@ -29,6 +31,8 @@ var tools = []struct {
 	{"mypy", mypy.Tool, []string{"--version"}},
 	{"basedpyright", basedpyright.Tool, []string{"--version"}},
 	{"stylua", stylua.Tool, []string{"--version"}},
+	{"bun", bun.Tool, []string{"--version"}},
+	{"prettier", prettier.Tool, []string{"--version"}},
 }
 
 func TestTools(t *testing.T) {
