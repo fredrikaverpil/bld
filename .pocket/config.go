@@ -5,11 +5,15 @@ import (
 
 	"github.com/fredrikaverpil/pocket"
 	"github.com/fredrikaverpil/pocket/tasks/golang"
+	"github.com/fredrikaverpil/pocket/tasks/markdown"
 )
 
 // Config is the pocket configuration for this project.
 var Config = pocket.Config{
-	AutoRun: pocket.Paths(golang.Tasks()).DetectBy(golang.Detect()),
+	AutoRun: pocket.Serial(
+		pocket.Paths(golang.Tasks()).DetectBy(golang.Detect()),
+		pocket.Paths(markdown.Tasks()).DetectBy(markdown.Detect()),
+	),
 	ManualRun: []pocket.Runnable{
 		Greet,
 	},

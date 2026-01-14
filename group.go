@@ -50,7 +50,6 @@ func Serial(items ...any) Runnable {
 	return &serial{items: toRunnables(items)}
 }
 
-
 // executeSerial runs items sequentially with deduplication.
 func executeSerial(ctx context.Context, items []any) error {
 	ec := getExecContext(ctx)
@@ -123,7 +122,6 @@ func Parallel(items ...any) Runnable {
 	// Composition mode - return Runnable
 	return &parallel{items: toRunnables(items)}
 }
-
 
 // executeParallel runs items concurrently with deduplication.
 func executeParallel(ctx context.Context, items []any) error {
@@ -277,4 +275,3 @@ func Run(ctx context.Context, r Runnable, out *Output, cwd string, verbose bool)
 	ctx = withExecContext(ctx, ec)
 	return r.run(ctx)
 }
-

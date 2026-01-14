@@ -1,56 +1,85 @@
 // Package golang provides Go development tasks.
+// This is a "task" package - it orchestrates tools to do work.
 package golang
 
 import (
 	"context"
 
 	"github.com/fredrikaverpil/pocket"
+	"github.com/fredrikaverpil/pocket/tools/golangcilint"
+	"github.com/fredrikaverpil/pocket/tools/govulncheck"
 )
 
-// Tool versions - managed by renovate.
-const (
-	// renovate: datasource=go depName=github.com/golangci/golangci-lint/v2
-	golangciLintVersion = "v2.0.2"
+// Task definitions - these are the visible functions in CLI.
+var (
+	// Format formats Go code using go fmt.
+	Format = pocket.Func("go-format", "format Go code", format)
 
-	// renovate: datasource=go depName=golang.org/x/vuln
-	govulncheckVersion = "latest"
+	// Lint runs golangci-lint.
+	Lint = pocket.Func("go-lint", "run golangci-lint", lint).
+		With(LintOptions{})
+
+	// Test runs tests with race detection.
+	Test = pocket.Func("go-test", "run Go tests", test).
+		With(TestOptions{Race: true})
+
+	// Vulncheck runs govulncheck for vulnerability scanning.
+	Vulncheck = pocket.Func("go-vulncheck", "run govulncheck", vulncheck)
 )
 
-// golangci-lint configuration.
-var golangciLintConfig = pocket.ToolConfig{
-	UserFiles:   []string{".golangci.yml", ".golangci.yaml", ".golangci.toml", ".golangci.json"},
-	DefaultFile: "", // No default config - use golangci-lint defaults
+// Option configures the golang task group.
+type Option func(*config)
+
+type config struct {
+	lint LintOptions
+	test TestOptions
 }
 
-// Task definitions.
-var (
-	// GoFormat formats Go code using go fmt.
-	GoFormat = pocket.Func("go-format", "format Go code", goFormat)
+// WithLint sets options for the go-lint task.
+func WithLint(opts LintOptions) Option {
+	return func(c *config) { c.lint = opts }
+}
 
-	// GoLint runs golangci-lint.
-	GoLint = pocket.Func("go-lint", "run golangci-lint", goLint)
+// WithTest sets options for the go-test task.
+func WithTest(opts TestOptions) Option {
+	return func(c *config) { c.test = opts }
+}
 
-	// GoTest runs tests with race detection.
-	GoTest = pocket.Func("go-test", "run tests with race detection", goTest)
-
-	// GoVulncheck runs govulncheck for vulnerability scanning.
-	GoVulncheck = pocket.Func("go-vulncheck", "run govulncheck", goVulncheck)
-
-	// InstallGolangciLint installs golangci-lint.
-	InstallGolangciLint = pocket.Func("install:golangci-lint", "install golangci-lint", installGolangciLint).Hidden()
-
-	// InstallGovulncheck installs govulncheck.
-	InstallGovulncheck = pocket.Func("install:govulncheck", "install govulncheck", installGovulncheck).Hidden()
-)
-
-// Tasks returns the default Go tasks as a serial runnable.
-// Use this with pocket.Paths().DetectBy(golang.Detect()) for auto-detection.
+// Tasks returns all Go tasks as a Runnable.
+// Use this with pocket.Paths().DetectBy() for auto-detection.
 //
 // Example:
 //
 //	pocket.Paths(golang.Tasks()).DetectBy(golang.Detect())
-func Tasks() pocket.Runnable {
-	return pocket.Serial(GoFormat, GoLint, GoTest, GoVulncheck)
+//
+// Example with options:
+//
+//	pocket.Paths(golang.Tasks(
+//	    golang.WithLint(golang.LintOptions{Config: ".golangci.yml"}),
+//	    golang.WithTest(golang.TestOptions{Race: false}),
+//	)).DetectBy(golang.Detect())
+func Tasks(opts ...Option) pocket.Runnable {
+	var cfg config
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
+	// Apply options to tasks
+	lintTask := Lint
+	if cfg.lint != (LintOptions{}) {
+		lintTask = Lint.With(cfg.lint)
+	}
+
+	testTask := Test
+	if cfg.test != (TestOptions{}) {
+		testTask = Test.With(cfg.test)
+	}
+
+	return pocket.Serial(
+		Format,
+		lintTask,
+		pocket.Parallel(testTask, Vulncheck),
+	)
 }
 
 // Detect returns a detection function for Go modules.
@@ -61,49 +90,60 @@ func Detect() func() []string {
 	}
 }
 
+// LintOptions configures the go-lint task.
+type LintOptions struct {
+	Config string `arg:"config" usage:"path to golangci-lint config file"`
+	Fix    bool   `arg:"fix"    usage:"auto-fix issues"`
+}
+
+// TestOptions configures the go-test task.
+type TestOptions struct {
+	Race    bool `arg:"race"    usage:"enable race detection (default: true)"`
+	Short   bool `arg:"short"   usage:"run short tests only"`
+	Verbose bool `arg:"verbose" usage:"verbose output"`
+}
+
 // Task implementations.
 
-func goFormat(ctx context.Context) error {
+func format(ctx context.Context) error {
 	return pocket.Exec(ctx, "go", "fmt", "./...")
 }
 
-func goLint(ctx context.Context) error {
-	// Install golangci-lint if needed (runs once per execution due to dedup)
-	pocket.Serial(ctx, InstallGolangciLint)
+func lint(ctx context.Context) error {
+	opts := pocket.Options[LintOptions](ctx)
 
 	args := []string{"run"}
-
-	// Check for user config file.
-	configPath, err := pocket.ConfigPath("golangci-lint", golangciLintConfig)
-	if err != nil {
-		return err
-	}
-	if configPath != "" {
+	if opts.Config != "" {
+		args = append(args, "-c", opts.Config)
+	} else if configPath, err := pocket.ConfigPath("golangci-lint", golangcilint.Config); err == nil && configPath != "" {
 		args = append(args, "-c", configPath)
 	}
-
+	if opts.Fix {
+		args = append(args, "--fix")
+	}
 	args = append(args, "./...")
-	return pocket.Exec(ctx, "golangci-lint", args...)
+
+	return golangcilint.Exec(ctx, args...)
 }
 
-func goTest(ctx context.Context) error {
-	return pocket.Exec(ctx, "go", "test", "-race", "./...")
+func test(ctx context.Context) error {
+	opts := pocket.Options[TestOptions](ctx)
+
+	args := []string{"test"}
+	if opts.Verbose {
+		args = append(args, "-v")
+	}
+	if opts.Race {
+		args = append(args, "-race")
+	}
+	if opts.Short {
+		args = append(args, "-short")
+	}
+	args = append(args, "./...")
+
+	return pocket.Exec(ctx, "go", args...)
 }
 
-func goVulncheck(ctx context.Context) error {
-	// Install govulncheck if needed (runs once per execution due to dedup)
-	pocket.Serial(ctx, InstallGovulncheck)
-	return pocket.Exec(ctx, "govulncheck", "./...")
-}
-
-// Install functions.
-
-func installGolangciLint(ctx context.Context) error {
-	pocket.Printf(ctx, "Installing golangci-lint %s...\n", golangciLintVersion)
-	return pocket.InstallGo(ctx, "github.com/golangci/golangci-lint/v2/cmd/golangci-lint", golangciLintVersion)
-}
-
-func installGovulncheck(ctx context.Context) error {
-	pocket.Printf(ctx, "Installing govulncheck %s...\n", govulncheckVersion)
-	return pocket.InstallGo(ctx, "golang.org/x/vuln/cmd/govulncheck", govulncheckVersion)
+func vulncheck(ctx context.Context) error {
+	return govulncheck.Exec(ctx, "./...")
 }
