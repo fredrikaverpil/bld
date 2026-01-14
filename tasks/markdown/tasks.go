@@ -37,6 +37,11 @@ func FormatTask() *pocket.Task {
 
 // formatAction is the action for the md-format task.
 func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := prettier.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	args := []string{"--write"}
 	if configPath, _ := prettier.Tool.ConfigPath(); configPath != "" {
 		args = append(args, "--config", configPath)
@@ -77,6 +82,11 @@ func MdformatTask() *pocket.Task {
 
 // mdformatAction is the action for the mdformat task.
 func mdformatAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := mdformat.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	absDir := pocket.FromGitRoot(tc.Path)
 	if err := mdformat.Tool.Exec(ctx, tc, "--number", "--wrap", "80", absDir); err != nil {
 		return fmt.Errorf("mdformat failed in %s: %w", tc.Path, err)

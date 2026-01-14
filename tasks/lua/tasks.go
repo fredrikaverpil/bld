@@ -64,6 +64,11 @@ func FormatTask() *pocket.Task {
 
 // formatAction is the action for the lua-format task.
 func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := stylua.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	opts := pocket.GetOptions[FormatOptions](tc)
 	configPath := opts.StyluaConfig
 	if configPath == "" {

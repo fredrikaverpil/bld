@@ -76,6 +76,11 @@ func FormatTask() *pocket.Task {
 
 // formatAction is the action for the py-format task.
 func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := ruff.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	opts := pocket.GetOptions[FormatOptions](tc)
 	configPath := opts.RuffConfig
 	if configPath == "" {
@@ -105,6 +110,11 @@ func LintTask() *pocket.Task {
 
 // lintAction is the action for the py-lint task.
 func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := ruff.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	opts := pocket.GetOptions[LintOptions](tc)
 	configPath := opts.RuffConfig
 	if configPath == "" {
@@ -128,6 +138,11 @@ func TypecheckTask() *pocket.Task {
 
 // typecheckAction is the action for the py-typecheck task.
 func typecheckAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := mypy.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	if err := mypy.Tool.Exec(ctx, tc, tc.Path); err != nil {
 		return fmt.Errorf("mypy failed in %s: %w", tc.Path, err)
 	}

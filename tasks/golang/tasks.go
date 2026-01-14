@@ -88,6 +88,11 @@ func FormatTask() *pocket.Task {
 
 // formatAction is the action for the go-format task.
 func formatAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := golangcilint.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	opts := pocket.GetOptions[FormatOptions](tc)
 	configPath := opts.LintConfig
 	if configPath == "" {
@@ -122,6 +127,11 @@ func LintTask() *pocket.Task {
 
 // lintAction is the action for the go-lint task.
 func lintAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := golangcilint.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	opts := pocket.GetOptions[LintOptions](tc)
 	configPath := opts.LintConfig
 	if configPath == "" {
@@ -193,6 +203,11 @@ func VulncheckTask() *pocket.Task {
 
 // vulncheckAction is the action for the go-vulncheck task.
 func vulncheckAction(ctx context.Context, tc *pocket.TaskContext) error {
+	// Install tool dependency first.
+	if err := govulncheck.Tool.Run(ctx, tc.Execution()); err != nil {
+		return err
+	}
+
 	cmd, err := govulncheck.Tool.Command(ctx, tc, "./...")
 	if err != nil {
 		return fmt.Errorf("prepare govulncheck: %w", err)
