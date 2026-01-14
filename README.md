@@ -38,6 +38,11 @@ other build tools.
   - [ ] What a "Runnable" is, and how it gets executed
     - [ ] Concurrency
     - [ ] Errors
+- [ ] Review README.md
+  - [ ] Explain concepts
+    - [ ] Runnable
+    - [ ] How Task and Tool implements Runnable
+    - [ ] Path resolver mechanism
 
 ## Quickstart
 
