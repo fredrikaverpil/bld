@@ -4,8 +4,7 @@ package tasks
 
 import (
 	"github.com/fredrikaverpil/pocket"
-	// Import scaffold to trigger init() which registers GenerateAll.
-	_ "github.com/fredrikaverpil/pocket/internal/scaffold"
+	"github.com/fredrikaverpil/pocket/internal/scaffold"
 )
 
 // Run is the main entry point for running pocket tasks.
@@ -21,5 +20,7 @@ import (
 //	    tasks.Run(Config)
 //	}
 func Run(cfg pocket.Config) {
+	// Register scaffold.GenerateAll for built-in tasks (generate, update).
+	pocket.RegisterGenerateAll(scaffold.GenerateAll)
 	pocket.RunConfig(cfg)
 }

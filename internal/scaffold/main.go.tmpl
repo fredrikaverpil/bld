@@ -4,12 +4,8 @@
 
 package main
 
-import (
-	"github.com/fredrikaverpil/pocket"
-	// Import tasks to register scaffold.GenerateAll for built-in tasks.
-	_ "github.com/fredrikaverpil/pocket/tasks"
-)
+import "github.com/fredrikaverpil/pocket/tasks"
 
 func main() {
-	pocket.RunConfig(Config)
+	tasks.Run(Config)
 }

@@ -15,7 +15,7 @@ import (
 // This is a hidden dependency - other tools call this, users don't.
 var Install = pocket.Func("install:bun", "ensure bun is available", install).Hidden()
 
-func install(ctx context.Context) error {
+func install(_ context.Context) error {
 	if _, err := exec.LookPath("bun"); err != nil {
 		return fmt.Errorf("bun not found in PATH - install from https://bun.sh")
 	}

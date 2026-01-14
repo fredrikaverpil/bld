@@ -65,51 +65,6 @@ func RunConfig(cfg Config) {
 	Main(allFuncs, allFunc, nil, pathMappings, autoRunNames, builtinFuncs)
 }
 
-// RunConfig2 is the main entry point for running a pocket v2 configuration.
-// It supports the new Cmd-based manual run.
-//
-// Example usage in .pocket/main.go:
-//
-//	func main() {
-//	    pocket.RunConfig2(Config)
-//	}
-func RunConfig2(cfg Config2) {
-	cfg = cfg.WithDefaults2()
-
-	// Collect all functions and path mappings from AutoRun.
-	var allFuncs []*FuncDef
-	pathMappings := make(map[string]*PathFilter)
-	autoRunNames := make(map[string]bool)
-
-	if cfg.AutoRun != nil {
-		allFuncs = cfg.AutoRun.funcs()
-		pathMappings = CollectPathMappings(cfg.AutoRun)
-		for _, f := range allFuncs {
-			autoRunNames[f.name] = true
-		}
-	}
-
-	// Create an "all" function that runs the entire AutoRun tree.
-	var allFunc *FuncDef
-	if cfg.AutoRun != nil {
-		allFunc = Func("all", "run all tasks", func(ctx context.Context) error {
-			return cfg.AutoRun.run(ctx)
-		})
-	}
-
-	// Collect built-in tasks (generate and update need Config).
-	// Convert Config2 to Config for built-in tasks that need it.
-	legacyCfg := Config{
-		AutoRun:     cfg.AutoRun,
-		Shim:        cfg.Shim,
-		SkipGitDiff: cfg.SkipGitDiff,
-	}
-	builtinFuncs := builtinTasks(&legacyCfg)
-
-	// Call the CLI main function with commands.
-	Main(allFuncs, allFunc, cfg.ManualRun, pathMappings, autoRunNames, builtinFuncs)
-}
-
 // builtinTasks returns the built-in tasks that are always available.
 // These include: clean, generate, git-diff, update.
 func builtinTasks(cfg *Config) []*FuncDef {

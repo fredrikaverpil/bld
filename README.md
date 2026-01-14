@@ -298,11 +298,11 @@ var Config = pocket.Config{
 
 #### Summary
 
-| Type             | Purpose            | Exports                               | Example          |
-| ---------------- | ------------------ | ------------------------------------- | ---------------- |
-| **Runtime Tool** | Provides a runtime | `Install` (hidden)                    | bun, uv          |
-| **Action Tool**  | Does something     | `Install` + action func + `Exec()`    | prettier, ruff   |
-| **Task Package** | Orchestrates tools | Tasks + `Workflow()` + `Detect()` | markdown, golang |
+| Type             | Purpose            | Exports                            | Example          |
+| ---------------- | ------------------ | ---------------------------------- | ---------------- |
+| **Runtime Tool** | Provides a runtime | `Install` (hidden)                 | bun, uv          |
+| **Action Tool**  | Does something     | `Install` + action func + `Exec()` | prettier, ruff   |
+| **Task Package** | Orchestrates tools | Tasks + `Workflow()` + `Detect()`  | markdown, golang |
 
 ### Config Usage
 

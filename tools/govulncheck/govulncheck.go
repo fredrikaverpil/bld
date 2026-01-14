@@ -9,7 +9,7 @@ import (
 )
 
 // renovate: datasource=go depName=golang.org/x/vuln
-const Version = "latest"
+const Version = "v1.1.4" // NOTE: May need updating for Go 1.25+ compatibility
 
 // Install ensures govulncheck is available.
 // This is a hidden dependency used by Check and Exec.

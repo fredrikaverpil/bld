@@ -96,7 +96,7 @@ func Exec(ctx context.Context, name string, args ...string) error {
 //	func updateDeps(ctx context.Context) error {
 //	    return pocket.ExecIn(ctx, ".pocket", "go", "mod", "tidy")
 //	}
-func ExecIn(ctx context.Context, dir string, name string, args ...string) error {
+func ExecIn(ctx context.Context, dir, name string, args ...string) error {
 	ec := getExecContext(ctx)
 	cmd := newCommand(ctx, name, args...)
 	cmd.Stdout = ec.out.Stdout

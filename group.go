@@ -79,7 +79,7 @@ func (s *serial) run(ctx context.Context) error {
 }
 
 func (s *serial) funcs() []*FuncDef {
-	var all []*FuncDef
+	all := make([]*FuncDef, 0, len(s.items))
 	for _, r := range s.items {
 		all = append(all, r.funcs()...)
 	}
@@ -212,7 +212,7 @@ func (p *parallel) run(ctx context.Context) error {
 }
 
 func (p *parallel) funcs() []*FuncDef {
-	var all []*FuncDef
+	all := make([]*FuncDef, 0, len(p.items))
 	for _, r := range p.items {
 		all = append(all, r.funcs()...)
 	}

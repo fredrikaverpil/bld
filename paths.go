@@ -178,11 +178,9 @@ func (p *PathFilter) runWithSkips(ctx context.Context, path string) error {
 		if len(rule.paths) == 0 {
 			// Skip everywhere
 			skipped[rule.funcName] = true
-		} else {
+		} else if slices.Contains(rule.paths, path) {
 			// Skip only in specific paths
-			if slices.Contains(rule.paths, path) {
-				skipped[rule.funcName] = true
-			}
+			skipped[rule.funcName] = true
 		}
 	}
 

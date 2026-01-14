@@ -14,7 +14,7 @@ type CLITestOptions struct {
 }
 
 func TestPrintFuncHelp_NoArgs(t *testing.T) {
-	fn := Func("test-func", "a test func", func(ctx context.Context) error { return nil })
+	fn := Func("test-func", "a test func", func(_ context.Context) error { return nil })
 
 	// Verify func with no args is set up correctly.
 	info, err := inspectArgs(fn.opts)
@@ -27,7 +27,7 @@ func TestPrintFuncHelp_NoArgs(t *testing.T) {
 }
 
 func TestPrintFuncHelp_WithArgs(t *testing.T) {
-	fn := Func("greet", "print a greeting", func(ctx context.Context) error { return nil }).
+	fn := Func("greet", "print a greeting", func(_ context.Context) error { return nil }).
 		With(CLITestOptions{Name: "world", Count: 5})
 
 	info, err := inspectArgs(fn.opts)
@@ -219,9 +219,9 @@ func TestDetectCwd_WithoutEnvVar(t *testing.T) {
 }
 
 func TestFilterFuncsByCwd(t *testing.T) {
-	fn1 := Func("fn1", "func 1", func(ctx context.Context) error { return nil })
-	fn2 := Func("fn2", "func 2", func(ctx context.Context) error { return nil })
-	fn3 := Func("fn3", "func 3", func(ctx context.Context) error { return nil }) // no path mapping
+	fn1 := Func("fn1", "func 1", func(_ context.Context) error { return nil })
+	fn2 := Func("fn2", "func 2", func(_ context.Context) error { return nil })
+	fn3 := Func("fn3", "func 3", func(_ context.Context) error { return nil }) // no path mapping
 
 	// Create path mappings.
 	// fn1 runs in proj1, fn2 runs in root.
@@ -256,7 +256,7 @@ func TestFilterFuncsByCwd(t *testing.T) {
 }
 
 func TestIsFuncVisibleIn(t *testing.T) {
-	fn := Func("dummy", "dummy", func(ctx context.Context) error { return nil })
+	fn := Func("dummy", "dummy", func(_ context.Context) error { return nil })
 
 	mappings := map[string]*PathFilter{
 		"fn1": Paths(fn).In("proj1", "proj2"),

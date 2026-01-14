@@ -8,11 +8,11 @@ import (
 func TestSerial_ExecutionMode(t *testing.T) {
 	var executed []string
 
-	fn1 := func(ctx context.Context) error {
+	fn1 := func(_ context.Context) error {
 		executed = append(executed, "fn1")
 		return nil
 	}
-	fn2 := func(ctx context.Context) error {
+	fn2 := func(_ context.Context) error {
 		executed = append(executed, "fn2")
 		return nil
 	}
@@ -36,11 +36,11 @@ func TestSerial_ExecutionMode(t *testing.T) {
 func TestParallel_ExecutionMode(t *testing.T) {
 	executed := make(chan string, 2)
 
-	fn1 := func(ctx context.Context) error {
+	fn1 := func(_ context.Context) error {
 		executed <- "fn1"
 		return nil
 	}
-	fn2 := func(ctx context.Context) error {
+	fn2 := func(_ context.Context) error {
 		executed <- "fn2"
 		return nil
 	}
@@ -54,7 +54,7 @@ func TestParallel_ExecutionMode(t *testing.T) {
 	Parallel(ctx, fn1, fn2)
 
 	close(executed)
-	var results []string
+	results := make([]string, 0, 2)
 	for s := range executed {
 		results = append(results, s)
 	}
