@@ -1,6 +1,6 @@
 # pocket
 
-A cross-platform build system inspired by [Mage](https://magefile.org/) and
+A cross-platform build system inspired by
 [Sage](https://github.com/einride/sage). Define functions, compose them with
 `Serial`/`Parallel`, and let pocket handle tool installation.
 
@@ -370,10 +370,3 @@ var Config = pocket.Config{
 
 - [Architecture](architecture.md) - Internal design: execution model, shim
   generation, path resolution
-
-## Acknowledgements
-
-- [einride/sage](https://github.com/einride/sage) - Inspiration for the
-  function-based architecture and dependency pattern
-- [magefile/mage](https://github.com/magefile/mage) - Inspiration for the
-  Go-based build system approach
