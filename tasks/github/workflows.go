@@ -18,6 +18,7 @@ var workflowTemplates embed.FS
 
 // WorkflowsOptions configures which workflows to bootstrap.
 type WorkflowsOptions struct {
+	Pocket  bool `arg:"pocket"  usage:"include pocket CI workflow"`
 	PR      bool `arg:"pr"      usage:"include PR validation workflow"`
 	Release bool `arg:"release" usage:"include release-please workflow"`
 	Stale   bool `arg:"stale"   usage:"include stale issues workflow"`
@@ -51,7 +52,7 @@ func workflows(ctx context.Context) error {
 	verbose := pocket.Verbose(ctx)
 
 	// If no specific workflows selected, include all
-	includeAll := opts.All || (!opts.PR && !opts.Release && !opts.Stale)
+	includeAll := opts.All || (!opts.Pocket && !opts.PR && !opts.Release && !opts.Stale)
 
 	// Ensure .github/workflows directory exists
 	workflowDir := pocket.FromGitRoot(".github", "workflows")
@@ -74,6 +75,7 @@ func workflows(ctx context.Context) error {
 	staleConfig := DefaultStaleConfig()
 
 	workflowDefs := []workflowDef{
+		{"pocket.yml.tmpl", "pocket.yml", nil, includeAll || opts.Pocket},
 		{"pr.yml.tmpl", "pr.yml", nil, includeAll || opts.PR},
 		{"release.yml.tmpl", "release.yml", nil, includeAll || opts.Release},
 		{"stale.yml.tmpl", "stale.yml", staleConfig, includeAll || opts.Stale},
