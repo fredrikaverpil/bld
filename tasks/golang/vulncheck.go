@@ -16,7 +16,7 @@ var Vulncheck = pocket.Func("go-vulncheck", "run govulncheck", pocket.Serial(
 func vulncheck(ctx context.Context) error {
 	args := []string{}
 	if pocket.Verbose(ctx) {
-		args = append(args, "-v")
+		args = append(args, "-show", "verbose")
 	}
 	args = append(args, "./...")
 	return pocket.Exec(ctx, govulncheck.Name, args...)
