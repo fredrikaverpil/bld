@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 
 	"github.com/fredrikaverpil/pocket"
@@ -79,8 +80,22 @@ func install(ctx context.Context) error {
 	}
 
 	// Install prettier using bun with frozen lockfile.
-	// No symlink needed - prettier.Exec() uses bun.Run() directly.
-	return bun.InstallFromLockfile(ctx, installDir)
+	if err := bun.InstallFromLockfile(ctx, installDir); err != nil {
+		return err
+	}
+
+	// Create symlink on non-Windows platforms.
+	// On Windows, we skip symlink creation and use bun.Run() in Exec() instead,
+	// because Windows node_modules/.bin shims are PE executables that bun cannot
+	// execute directly (it tries to parse them as JavaScript).
+	// TODO: revisit once https://github.com/oven-sh/bun/issues/22422 or similar is resolved.
+	if runtime.GOOS != pocket.Windows {
+		if _, err := pocket.CreateSymlink(binary); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // Config for prettier configuration file lookup.
@@ -117,8 +132,17 @@ func EnsureIgnoreFile() (string, error) {
 }
 
 // Exec runs prettier with the given arguments.
-// Uses bun.Run internally for cross-platform reliability (avoids Windows shim issues).
+// On Windows, uses bun.Run() because node_modules/.bin shims are PE executables
+// that bun cannot execute directly. On other platforms, uses the symlinked binary.
 func Exec(ctx context.Context, args ...string) error {
 	installDir := pocket.FromToolsDir(Name, Version())
-	return bun.Run(ctx, installDir, Name, args...)
+
+	// On Windows, use bun.Run() to avoid shim execution issues.
+	// See install() comment for details.
+	if runtime.GOOS == pocket.Windows {
+		return bun.Run(ctx, installDir, Name, args...)
+	}
+
+	// On other platforms, run via the symlinked binary.
+	return pocket.Exec(ctx, Name, args...)
 }
