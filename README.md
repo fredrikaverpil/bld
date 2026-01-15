@@ -366,6 +366,11 @@ var Config = pocket.Config{
 }
 ```
 
+## Documentation
+
+- [Architecture](architecture.md) - Internal design: execution model, shim
+  generation, path resolution
+
 ## Acknowledgements
 
 - [einride/sage](https://github.com/einride/sage) - Inspiration for the
