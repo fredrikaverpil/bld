@@ -163,6 +163,66 @@ func isGoVersion(s string) bool {
 	return true
 }
 
+// InstallCargoGit installs a Rust binary using 'cargo install --git'.
+// The binary is installed to .pocket/tools/cargo/<name>/<version>/
+// and symlinked to .pocket/bin/.
+// Requires cargo to be installed on the system.
+//
+// Example:
+//
+//	func installTool(ctx context.Context) error {
+//	    return pocket.InstallCargoGit(ctx, "https://github.com/org/tool", "tool", "v1.0.0")
+//	}
+func InstallCargoGit(ctx context.Context, repo, name, version string) error {
+	binaryName := name
+	if runtime.GOOS == Windows {
+		binaryName += ".exe"
+	}
+
+	// Destination directory: .pocket/tools/cargo/<name>/<version>/
+	toolDir := FromToolsDir("cargo", name, version)
+	binaryPath := filepath.Join(toolDir, binaryName)
+
+	// Check if already installed.
+	if _, err := os.Stat(binaryPath); err == nil {
+		// Already installed, ensure symlink exists.
+		if _, err := CreateSymlink(binaryPath); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Create tool directory.
+	if err := os.MkdirAll(toolDir, 0o755); err != nil {
+		return fmt.Errorf("create tool dir: %w", err)
+	}
+
+	// Run cargo install --git with CARGO_HOME set.
+	Printf(ctx, "  cargo install --git %s %s\n", repo, name)
+
+	ec := getExecContext(ctx)
+	cmd := newCommand(ctx, "cargo", "install", "--git", repo, name, "--root", toolDir)
+	cmd.Stdout = ec.out.Stdout
+	cmd.Stderr = ec.out.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cargo install %s: %w", name, err)
+	}
+
+	// cargo install --root creates a bin subdirectory
+	installedPath := filepath.Join(toolDir, "bin", binaryName)
+	if _, err := os.Stat(installedPath); err != nil {
+		return fmt.Errorf("binary not found at %s: %w", installedPath, err)
+	}
+
+	// Create symlink to the binary in the bin subdirectory.
+	if _, err := CreateSymlink(installedPath); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // VenvBinaryPath returns the cross-platform path to a binary in a Python venv.
 func VenvBinaryPath(venvDir, name string) string {
 	if runtime.GOOS == Windows {
