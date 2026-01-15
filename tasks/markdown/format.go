@@ -29,17 +29,19 @@ func format(ctx context.Context) error {
 		args = append(args, "--write")
 	}
 
-	// Add config if available
+	// Add config if available (use absolute path)
 	if configPath, err := pocket.ConfigPath("prettier", prettier.Config); err == nil && configPath != "" {
 		args = append(args, "--config", configPath)
 	}
 
-	// Add ignore file if available
+	// Add ignore file if available (use absolute path)
 	if ignorePath, err := prettier.EnsureIgnoreFile(); err == nil {
 		args = append(args, "--ignore-path", ignorePath)
 	}
 
-	args = append(args, "**/*.md")
+	// Use absolute path pattern since prettier runs from install directory
+	pattern := pocket.FromGitRoot("**/*.md")
+	args = append(args, pattern)
 
 	if err := prettier.Exec(ctx, args...); err != nil {
 		return fmt.Errorf("prettier failed: %w", err)

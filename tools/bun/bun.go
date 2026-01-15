@@ -90,13 +90,12 @@ func InstallFromLockfile(ctx context.Context, dir string) error {
 }
 
 // Run executes a package installed via bun.
-// Instead of using the node_modules/.bin shim (which fails on Windows),
-// this runs the package's main script directly via bun as the runtime.
+// Uses "bun run" from the install directory to properly resolve the package.
+// File arguments should use absolute paths to work correctly.
 func Run(ctx context.Context, installDir, packageName string, args ...string) error {
-	// Run the package's bin script directly with bun as the runtime.
-	// This avoids Windows shim issues while preserving the current working directory.
-	binPath := BinaryPath(installDir, packageName)
-	runArgs := []string{binPath}
+	// Use "bun run <package>" from the install directory.
+	// This works on all platforms including Windows where .exe shims fail.
+	runArgs := []string{"run", "--cwd", installDir, packageName}
 	runArgs = append(runArgs, args...)
 	return pocket.Exec(ctx, Name, runArgs...)
 }
