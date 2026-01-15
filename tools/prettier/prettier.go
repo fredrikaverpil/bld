@@ -64,8 +64,7 @@ func install(ctx context.Context) error {
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {
-		_, err := pocket.CreateSymlink(binary)
-		return err
+		return nil
 	}
 
 	// Create install directory and write lockfile.
@@ -80,13 +79,8 @@ func install(ctx context.Context) error {
 	}
 
 	// Install prettier using bun with frozen lockfile.
-	if err := bun.InstallFromLockfile(ctx, installDir); err != nil {
-		return err
-	}
-
-	// Create symlink to .pocket/bin/.
-	_, err := pocket.CreateSymlink(binary)
-	return err
+	// No symlink needed - prettier.Exec() uses bun.Run() directly.
+	return bun.InstallFromLockfile(ctx, installDir)
 }
 
 // Config for prettier configuration file lookup.
