@@ -9,9 +9,15 @@ import (
 type Option func(*config)
 
 type config struct {
-	format FormatOptions
-	lint   LintOptions
-	test   TestOptions
+	pythonVersion string
+	format        FormatOptions
+	lint          LintOptions
+	test          TestOptions
+}
+
+// WithPythonVersion sets the Python version for uv commands.
+func WithPythonVersion(version string) Option {
+	return func(c *config) { c.pythonVersion = version }
 }
 
 // WithFormat sets options for the py-format task.
@@ -46,6 +52,12 @@ func Workflow(opts ...Option) pocket.Runnable {
 		opt(&cfg)
 	}
 
+	// Sync task with Python version
+	syncTask := Sync
+	if cfg.pythonVersion != "" {
+		syncTask = Sync.With(SyncOptions{PythonVersion: cfg.pythonVersion})
+	}
+
 	formatTask := Format
 	if cfg.format != (FormatOptions{}) {
 		formatTask = Format.With(cfg.format)
@@ -61,8 +73,8 @@ func Workflow(opts ...Option) pocket.Runnable {
 		testTask = Test.With(cfg.test)
 	}
 
-	// Run format and lint in serial since both modify files
-	return pocket.Serial(formatTask, lintTask, Typecheck, testTask)
+	// Run sync first, then format, lint, typecheck, test (serial since format/lint modify files)
+	return pocket.Serial(syncTask, formatTask, lintTask, Typecheck, testTask)
 }
 
 // Detect returns a detection function that finds Python projects.
