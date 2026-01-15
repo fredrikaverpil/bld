@@ -99,7 +99,12 @@ func withOptions(ctx context.Context, opts any) context.Context {
 
 	// Detect shadowing: nested functions cannot use the same options type
 	if ctx.Value(t) != nil {
-		panic(fmt.Sprintf("pocket: options type %s already in context; nested functions cannot share the same options type", t))
+		panic(
+			fmt.Sprintf(
+				"pocket: options type %s already in context; nested functions cannot share the same options type",
+				t,
+			),
+		)
 	}
 
 	if reflect.TypeOf(opts).Kind() == reflect.Pointer {
