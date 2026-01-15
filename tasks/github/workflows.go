@@ -18,12 +18,15 @@ var workflowTemplates embed.FS
 
 // WorkflowsOptions configures which workflows to bootstrap.
 type WorkflowsOptions struct {
-	Pocket  bool `arg:"pocket"  usage:"include pocket CI workflow"`
-	PR      bool `arg:"pr"      usage:"include PR validation workflow"`
-	Release bool `arg:"release" usage:"include release-please workflow"`
-	Stale   bool `arg:"stale"   usage:"include stale issues workflow"`
-	All     bool `arg:"all"     usage:"include all workflows (default if none specified)"`
-	Force   bool `arg:"force"   usage:"overwrite existing workflow files"`
+	Pocket     bool `arg:"pocket"      usage:"include pocket CI workflow"`
+	PR         bool `arg:"pr"          usage:"include PR validation workflow"`
+	Release    bool `arg:"release"     usage:"include release-please workflow"`
+	Stale      bool `arg:"stale"       usage:"include stale issues workflow"`
+	All        bool `arg:"all"         usage:"include all workflows (default if none specified)"`
+	SkipPocket bool `arg:"skip-pocket" usage:"exclude pocket workflow"`
+	SkipPR     bool `arg:"skip-pr"     usage:"exclude PR workflow"`
+	SkipStale  bool `arg:"skip-stale"  usage:"exclude stale workflow"`
+	Force      bool `arg:"force"       usage:"overwrite existing workflow files"`
 }
 
 // PocketConfig holds configuration for the pocket workflow template.
@@ -88,10 +91,10 @@ func workflows(ctx context.Context) error {
 	staleConfig := DefaultStaleConfig()
 
 	workflowDefs := []workflowDef{
-		{"pocket.yml.tmpl", "pocket.yml", pocketConfig, includeAll || opts.Pocket},
-		{"pr.yml.tmpl", "pr.yml", nil, includeAll || opts.PR},
+		{"pocket.yml.tmpl", "pocket.yml", pocketConfig, (includeAll || opts.Pocket) && !opts.SkipPocket},
+		{"pr.yml.tmpl", "pr.yml", nil, (includeAll || opts.PR) && !opts.SkipPR},
 		{"release.yml.tmpl", "release.yml", nil, includeAll || opts.Release},
-		{"stale.yml.tmpl", "stale.yml", staleConfig, includeAll || opts.Stale},
+		{"stale.yml.tmpl", "stale.yml", staleConfig, (includeAll || opts.Stale) && !opts.SkipStale},
 	}
 
 	copied := 0
