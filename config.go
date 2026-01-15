@@ -30,6 +30,11 @@ type Config struct {
 	// By default, only Posix (./pok) is generated with name "pok".
 	Shim *ShimConfig
 
+	// SkipGenerate disables running "generate" at the start of the "all" task.
+	// By default, "all" regenerates files before running tasks.
+	// Set to true to skip regeneration.
+	SkipGenerate bool
+
 	// SkipGitDiff disables the git diff check at the end of the "all" task.
 	// By default, "all" fails if there are uncommitted changes after running all tasks.
 	// Set to true to disable this check.

@@ -45,11 +45,33 @@ func RunConfig(cfg Config) {
 		}
 	}
 
-	// Create an "all" function that runs the entire AutoRun tree.
+	// Create an "all" function that runs generate → AutoRun → git-diff.
 	var allFunc *FuncDef
 	if cfg.AutoRun != nil {
 		allFunc = Func("all", "run all tasks", func(ctx context.Context) error {
-			return cfg.AutoRun.run(ctx)
+			// Run generate first (unless skipped).
+			if !cfg.SkipGenerate {
+				if generateAllFn == nil {
+					return fmt.Errorf("scaffold not registered; import github.com/fredrikaverpil/pocket/internal/scaffold")
+				}
+				if _, err := generateAllFn(&cfg); err != nil {
+					return fmt.Errorf("generate: %w", err)
+				}
+			}
+
+			// Run the AutoRun tree.
+			if err := cfg.AutoRun.run(ctx); err != nil {
+				return err
+			}
+
+			// Run git-diff at the end (unless skipped).
+			if !cfg.SkipGitDiff {
+				if err := Exec(ctx, "git", "diff", "--exit-code"); err != nil {
+					return fmt.Errorf("uncommitted changes detected; please commit or stage your changes")
+				}
+			}
+
+			return nil
 		})
 	}
 
