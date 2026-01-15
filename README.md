@@ -158,6 +158,13 @@ pocket.Serial(ctx, fn1, fn2)    // run dependencies in sequence
 pocket.Parallel(ctx, fn1, fn2)  // run dependencies concurrently
 ```
 
+> [!NOTE]
+>
+> Be careful when using `pocket.Parallel()`. Only parallelize functions that
+> don't conflict - typically read-only operations like linting or testing.
+> Functions that mutate files (formatters, code generators) should run in serial
+> before other functions read those files.
+
 ### Tools vs Tasks
 
 Pocket conceptually distinguishes between **tools** (installers) and **tasks**
@@ -223,13 +230,6 @@ func Detect() func() []string {
     return func() []string { return pocket.DetectByFile("pyproject.toml") }
 }
 ```
-
-> [!NOTE]
->
-> Be careful when using `pocket.Parallel()`. Only parallelize functions that
-> don't conflict - typically read-only operations like linting or testing.
-> Functions that mutate files (formatters, code generators) should run in serial
-> before other functions read those files.
 
 #### Summary
 
