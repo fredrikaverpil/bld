@@ -2,17 +2,19 @@
 package github
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/template"
 
 	"github.com/fredrikaverpil/pocket"
 )
 
-//go:embed workflows/*.yml
-var workflowFiles embed.FS
+//go:embed workflows/*.tmpl
+var workflowTemplates embed.FS
 
 // WorkflowsOptions configures which workflows to bootstrap.
 type WorkflowsOptions struct {
@@ -20,6 +22,23 @@ type WorkflowsOptions struct {
 	Release bool `arg:"release" usage:"include release-please workflow"`
 	Stale   bool `arg:"stale"   usage:"include stale issues workflow"`
 	All     bool `arg:"all"     usage:"include all workflows (default if none specified)"`
+	Force   bool `arg:"force"   usage:"overwrite existing workflow files"`
+}
+
+// StaleConfig holds configuration for the stale workflow template.
+type StaleConfig struct {
+	DaysBeforeStale int
+	DaysBeforeClose int
+	ExemptLabels    string
+}
+
+// DefaultStaleConfig returns the default stale workflow configuration.
+func DefaultStaleConfig() StaleConfig {
+	return StaleConfig{
+		DaysBeforeStale: 30,
+		DaysBeforeClose: 30,
+		ExemptLabels:    "dependencies,pinned,bug",
+	}
 }
 
 // Workflows bootstraps GitHub workflow files into .github/workflows/.
@@ -29,6 +48,7 @@ var Workflows = pocket.Func("github-workflows", "bootstrap GitHub workflow files
 
 func workflows(ctx context.Context) error {
 	opts := pocket.Options[WorkflowsOptions](ctx)
+	verbose := pocket.Verbose(ctx)
 
 	// If no specific workflows selected, include all
 	includeAll := opts.All || (!opts.PR && !opts.Release && !opts.Stale)
@@ -39,36 +59,68 @@ func workflows(ctx context.Context) error {
 		return fmt.Errorf("create workflows dir: %w", err)
 	}
 
-	// Map of workflow files to copy
-	workflowsToCopy := map[string]bool{
-		"pr.yml":      includeAll || opts.PR,
-		"release.yml": includeAll || opts.Release,
-		"stale.yml":   includeAll || opts.Stale,
+	if verbose {
+		pocket.Printf(ctx, "  Target directory: %s\n", workflowDir)
+	}
+
+	// Define workflows to process
+	type workflowDef struct {
+		tmplFile string
+		outFile  string
+		data     any
+		include  bool
+	}
+
+	staleConfig := DefaultStaleConfig()
+
+	workflowDefs := []workflowDef{
+		{"pr.yml.tmpl", "pr.yml", nil, includeAll || opts.PR},
+		{"release.yml.tmpl", "release.yml", nil, includeAll || opts.Release},
+		{"stale.yml.tmpl", "stale.yml", staleConfig, includeAll || opts.Stale},
 	}
 
 	copied := 0
-	for filename, include := range workflowsToCopy {
-		if !include {
+	for _, wf := range workflowDefs {
+		if !wf.include {
 			continue
 		}
 
-		content, err := workflowFiles.ReadFile(filepath.Join("workflows", filename))
-		if err != nil {
-			return fmt.Errorf("read embedded %s: %w", filename, err)
-		}
-
-		destPath := filepath.Join(workflowDir, filename)
+		destPath := filepath.Join(workflowDir, wf.outFile)
 
 		// Check if file already exists
-		if _, err := os.Stat(destPath); err == nil {
-			if pocket.Verbose(ctx) {
-				pocket.Printf(ctx, "  %s (already exists, skipping)\n", filename)
+		if _, err := os.Stat(destPath); err == nil && !opts.Force {
+			if verbose {
+				pocket.Printf(ctx, "  %s (already exists, skipping)\n", wf.outFile)
 			}
 			continue
 		}
 
+		// Read and parse template
+		tmplContent, err := workflowTemplates.ReadFile(filepath.Join("workflows", wf.tmplFile))
+		if err != nil {
+			return fmt.Errorf("read template %s: %w", wf.tmplFile, err)
+		}
+
+		var content []byte
+		if wf.data != nil {
+			// Render template with data
+			tmpl, err := template.New(wf.tmplFile).Parse(string(tmplContent))
+			if err != nil {
+				return fmt.Errorf("parse template %s: %w", wf.tmplFile, err)
+			}
+
+			var buf bytes.Buffer
+			if err := tmpl.Execute(&buf, wf.data); err != nil {
+				return fmt.Errorf("execute template %s: %w", wf.tmplFile, err)
+			}
+			content = buf.Bytes()
+		} else {
+			// No templating needed, use as-is
+			content = tmplContent
+		}
+
 		if err := os.WriteFile(destPath, content, 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", filename, err)
+			return fmt.Errorf("write %s: %w", wf.outFile, err)
 		}
 
 		pocket.Printf(ctx, "  Created %s\n", destPath)
@@ -76,7 +128,7 @@ func workflows(ctx context.Context) error {
 	}
 
 	if copied == 0 {
-		pocket.Println(ctx, "  All workflows already exist")
+		pocket.Println(ctx, "  All workflows already exist (use -force to overwrite)")
 	} else {
 		pocket.Printf(ctx, "  Bootstrapped %d workflow(s)\n", copied)
 	}
