@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -64,8 +65,14 @@ func commandBase(ctx context.Context, name string, args ...string) *exec.Cmd {
 	// This is needed because exec.Command resolves the binary using os.Getenv("PATH")
 	// at creation time, before cmd.Env takes effect.
 	if !strings.ContainsAny(name, `/\`) {
-		if binPath := filepath.Join(binDir, name); fileExists(binPath) {
+		binPath := filepath.Join(binDir, name)
+		if fileExists(binPath) {
 			name = binPath
+		} else if runtime.GOOS == "windows" {
+			// On Windows, binaries have .exe extension
+			if exePath := binPath + ".exe"; fileExists(exePath) {
+				name = exePath
+			}
 		}
 	}
 
