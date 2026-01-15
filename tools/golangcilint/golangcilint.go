@@ -11,7 +11,7 @@ import (
 const Name = "golangci-lint"
 
 // renovate: datasource=go depName=github.com/golangci/golangci-lint/v2
-const Version = "v2.0.2"
+const Version = "v2.8.0"
 
 // Install ensures golangci-lint is available.
 var Install = pocket.Func("install:golangci-lint", "install golangci-lint", install).Hidden()
