@@ -14,10 +14,10 @@ var Config = pocket.Config{
 	AutoRun: pocket.Serial(
 		pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()),
 		pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect()),
+		github.Workflows.With(github.WorkflowsOptions(github.WorkflowsOptions{Force: true, Pocket: false})),
 	),
 	ManualRun: []pocket.Runnable{
 		Greet,
-		github.Workflows.With(github.WorkflowsOptions(github.WorkflowsOptions{Force: true})),
 	},
 	Shim: &pocket.ShimConfig{
 		Posix:      true,
