@@ -33,7 +33,7 @@ type PocketConfig struct {
 // DefaultPocketConfig returns the default pocket workflow configuration.
 func DefaultPocketConfig() PocketConfig {
 	return PocketConfig{
-		Platforms: "ubuntu-latest",
+		Platforms: "ubuntu-latest, macos-latest, windows-latest",
 	}
 }
 
