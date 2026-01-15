@@ -11,7 +11,6 @@ type TestOptions struct {
 	SkipRace     bool `arg:"skip-race"     usage:"disable race detection"`
 	SkipCoverage bool `arg:"skip-coverage" usage:"disable coverage generation"`
 	Short        bool `arg:"short"         usage:"run short tests only"`
-	Verbose      bool `arg:"verbose"       usage:"verbose output"`
 }
 
 // Test runs tests with race detection and coverage by default.
@@ -22,7 +21,7 @@ func test(ctx context.Context) error {
 	opts := pocket.Options[TestOptions](ctx)
 
 	args := []string{"test"}
-	if opts.Verbose {
+	if pocket.Verbose(ctx) {
 		args = append(args, "-v")
 	}
 	if !opts.SkipRace {

@@ -33,6 +33,9 @@ func format(ctx context.Context) error {
 	absDir := pocket.FromGitRoot(pocket.Path(ctx))
 
 	args := []string{}
+	if pocket.Verbose(ctx) {
+		args = append(args, "--verbose")
+	}
 	if configPath != "" {
 		args = append(args, "-f", configPath)
 	}

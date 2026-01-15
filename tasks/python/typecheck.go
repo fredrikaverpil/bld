@@ -14,5 +14,10 @@ var Typecheck = pocket.Func("py-typecheck", "type-check Python files", pocket.Se
 ))
 
 func typecheck(ctx context.Context) error {
-	return pocket.Exec(ctx, mypy.Name, pocket.Path(ctx))
+	args := []string{}
+	if pocket.Verbose(ctx) {
+		args = append(args, "-v")
+	}
+	args = append(args, pocket.Path(ctx))
+	return pocket.Exec(ctx, mypy.Name, args...)
 }

@@ -23,6 +23,9 @@ func lint(ctx context.Context) error {
 	opts := pocket.Options[LintOptions](ctx)
 
 	args := []string{"run"}
+	if pocket.Verbose(ctx) {
+		args = append(args, "-v")
+	}
 	if opts.Config != "" {
 		args = append(args, "-c", opts.Config)
 	} else if configPath, err := pocket.ConfigPath("golangci-lint", golangcilint.Config); err == nil && configPath != "" {

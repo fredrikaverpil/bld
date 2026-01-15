@@ -10,7 +10,6 @@ import (
 // TestOptions configures the py-test task.
 type TestOptions struct {
 	SkipCoverage bool `arg:"skip-coverage" usage:"disable coverage generation"`
-	Verbose      bool `arg:"verbose"       usage:"verbose output (-vv)"`
 }
 
 // Test runs Python tests using pytest with coverage by default.
@@ -32,7 +31,7 @@ func test(ctx context.Context) error {
 	if opts.SkipCoverage {
 		// Run pytest directly without coverage
 		args := []string{"run", "pytest"}
-		if opts.Verbose {
+		if pocket.Verbose(ctx) {
 			args = append(args, "-vv")
 		}
 		return pocket.Exec(ctx, uv.Name, args...)
@@ -40,7 +39,7 @@ func test(ctx context.Context) error {
 
 	// Run with coverage: coverage run -m pytest
 	args := []string{"run", "coverage", "run", "-m", "pytest"}
-	if opts.Verbose {
+	if pocket.Verbose(ctx) {
 		args = append(args, "-vv")
 	}
 	if err := pocket.Exec(ctx, uv.Name, args...); err != nil {

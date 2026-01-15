@@ -31,6 +31,9 @@ func format(ctx context.Context) error {
 	}
 
 	args := []string{"format"}
+	if pocket.Verbose(ctx) {
+		args = append(args, "--verbose")
+	}
 	if configPath != "" {
 		args = append(args, "--config", configPath)
 	}

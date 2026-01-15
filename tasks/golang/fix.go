@@ -10,5 +10,10 @@ import (
 var Fix = pocket.Func("go-fix", "update code for newer Go versions", fix)
 
 func fix(ctx context.Context) error {
-	return pocket.Exec(ctx, "go", "fix", "./...")
+	args := []string{"fix"}
+	if pocket.Verbose(ctx) {
+		args = append(args, "-v")
+	}
+	args = append(args, "./...")
+	return pocket.Exec(ctx, "go", args...)
 }

@@ -32,6 +32,9 @@ func lint(ctx context.Context) error {
 	}
 
 	args := []string{"check"}
+	if pocket.Verbose(ctx) {
+		args = append(args, "--verbose")
+	}
 	if !opts.SkipFix {
 		args = append(args, "--fix")
 	}
