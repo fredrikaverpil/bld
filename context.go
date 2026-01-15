@@ -89,10 +89,20 @@ func withPath(ctx context.Context, path string) context.Context {
 
 // withOptions stores options for a function in the context.
 // It normalizes to the struct type if a pointer is provided.
+// Panics if the same options type is already in the context (nested functions
+// cannot share the same options type, as the inner would shadow the outer).
 func withOptions(ctx context.Context, opts any) context.Context {
 	t := reflect.TypeOf(opts)
 	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
+	}
+
+	// Detect shadowing: nested functions cannot use the same options type
+	if ctx.Value(t) != nil {
+		panic(fmt.Sprintf("pocket: options type %s already in context; nested functions cannot share the same options type", t))
+	}
+
+	if reflect.TypeOf(opts).Kind() == reflect.Pointer {
 		return context.WithValue(ctx, t, reflect.ValueOf(opts).Elem().Interface())
 	}
 	return context.WithValue(ctx, t, opts)

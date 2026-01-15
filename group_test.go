@@ -72,6 +72,36 @@ func TestParallel_Composition(t *testing.T) {
 	}
 }
 
+func TestOptions_ShadowingPanics(t *testing.T) {
+	type SharedOptions struct {
+		Value string
+	}
+
+	inner := func(_ context.Context) error {
+		return nil
+	}
+	outer := func(_ context.Context) error {
+		return nil
+	}
+
+	// Create nested FuncDefs that both use the same options type
+	innerFunc := Func("inner", "inner func", inner).With(SharedOptions{Value: "inner"})
+	outerFunc := Func("outer", "outer func", Serial(innerFunc, outer)).With(SharedOptions{Value: "outer"})
+
+	// Create execution context and run - should panic
+	out := StdOutput()
+	ec := newExecContext(out, ".", false)
+	ctx := withExecContext(context.Background(), ec)
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when nested functions share the same options type")
+		}
+	}()
+
+	_ = outerFunc.run(ctx)
+}
+
 func TestSerial_WithDependency(t *testing.T) {
 	var executed []string
 

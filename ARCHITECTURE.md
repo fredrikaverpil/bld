@@ -83,7 +83,9 @@ type FuncDef struct {
 }
 ```
 
-A FuncDef wraps a `Runnable` body. Plain functions are automatically wrapped in an internal `funcRunnable` during creation via `Func()`. Calling the function walks its entire subtree.
+A FuncDef wraps a `Runnable` body. Plain functions are automatically wrapped in
+an internal `funcRunnable` during creation via `Func()`. Calling the function
+walks its entire subtree.
 
 ### Composition
 
@@ -324,7 +326,8 @@ type execContext struct {
 }
 ```
 
-Options are stored directly in the `context.Context` keyed by their type, ensuring thread-safety during parallel execution.
+Options are stored directly in the `context.Context` keyed by their type,
+ensuring thread-safety during parallel execution.
 
 ### Helpers
 
