@@ -55,6 +55,7 @@ func Workflow(opts ...Option) pocket.Runnable {
 	}
 
 	return pocket.Serial(
+		Fix,
 		Format,
 		lintTask,
 		pocket.Parallel(testTask, Vulncheck),
