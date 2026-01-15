@@ -18,7 +18,7 @@ var Lint = pocket.Func("py-lint", "lint Python files", lint).
 	With(LintOptions{})
 
 func lint(ctx context.Context) error {
-	pocket.Serial(ctx, ruff.Install)
+	pocket.Serial(ruff.Install)
 
 	opts := pocket.Options[LintOptions](ctx)
 	configPath := opts.RuffConfig

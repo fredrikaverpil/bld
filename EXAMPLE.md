@@ -39,3 +39,14 @@ Or:
           },
       )
     }
+
+I wonder if we implemented something unified and recursive now. Maybe it would
+be easier to look at this from a purely functional standpoint. The composition
+tree should maybe only consist of pocket.Serial|Parallel calls and inside we
+would have Runnables. And we can nest pocket.Serial|Parallel with Runnables
+anyway we like. At all times. Would this make the implementation simpler and
+debugging simpler too?
+
+There would be no need for the user to specify Run functions. They would only
+work with pocket.Serial|Parallel and always return Runnables. And eventually
+they would use pocket.Exec for system commands inside their functions.

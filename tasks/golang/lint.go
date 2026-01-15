@@ -18,7 +18,7 @@ var Lint = pocket.Func("go-lint", "run golangci-lint", lint).
 	With(LintOptions{})
 
 func lint(ctx context.Context) error {
-	pocket.Serial(ctx, golangcilint.Install)
+	pocket.Serial(golangcilint.Install)
 
 	opts := pocket.Options[LintOptions](ctx)
 

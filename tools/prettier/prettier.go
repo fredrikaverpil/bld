@@ -37,7 +37,7 @@ func install(ctx context.Context) error {
 	}
 
 	// Ensure bun is installed.
-	pocket.Serial(ctx, bun.Install)
+	pocket.Serial(bun.Install)
 
 	// Create install directory.
 	if err := os.MkdirAll(installDir, 0o755); err != nil {

@@ -17,7 +17,7 @@ var Format = pocket.Func("go-format", "format Go code", format).
 	With(FormatOptions{})
 
 func format(ctx context.Context) error {
-	pocket.Serial(ctx, golangcilint.Install)
+	pocket.Serial(golangcilint.Install)
 
 	opts := pocket.Options[FormatOptions](ctx)
 

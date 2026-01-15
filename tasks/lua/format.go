@@ -18,7 +18,7 @@ var Format = pocket.Func("lua-format", "format Lua files", format).
 	With(FormatOptions{})
 
 func format(ctx context.Context) error {
-	pocket.Serial(ctx, stylua.Install)
+	pocket.Serial(stylua.Install)
 
 	opts := pocket.Options[FormatOptions](ctx)
 	configPath := opts.StyluaConfig

@@ -11,6 +11,6 @@ import (
 var Typecheck = pocket.Func("py-typecheck", "type-check Python files", typecheck)
 
 func typecheck(ctx context.Context) error {
-	pocket.Serial(ctx, mypy.Install)
+	pocket.Serial(mypy.Install)
 	return pocket.Exec(ctx, mypy.Name, pocket.Path(ctx))
 }

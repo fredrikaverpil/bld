@@ -18,15 +18,16 @@ type serial struct {
 	items []Runnable
 }
 
-// Serial has two modes based on whether the first argument is a context.Context:
+// Serial runs items sequentially.
 //
-// Execution mode (first arg is context.Context):
+// When called during function execution (inside a FuncDef body):
 //
-//	pocket.Serial(ctx, install1, install2)
+//	pocket.Serial(install1, install2)
 //
 // Executes items sequentially with deduplication. Panics on error (framework recovers).
+// Uses the implicit execution context set by the engine.
 //
-// Composition mode (first arg is NOT context.Context):
+// When called outside function execution (composition):
 //
 //	pocket.Serial(task1, task2, task3)
 //
@@ -38,46 +39,24 @@ func Serial(items ...any) Runnable {
 		return &serial{items: nil}
 	}
 
-	// Check if first item is context.Context (execution mode)
-	if ctx, ok := items[0].(context.Context); ok {
-		if err := executeSerial(ctx, items[1:]); err != nil {
-			panic(depsError{err})
+	// Check if we're in an active execution context (inside a function body)
+	if ctx, ok := getExecutionContext(); ok {
+		ec := getExecContext(ctx)
+		// Execute mode - run with deduplication
+		for _, item := range items {
+			r := toRunnable(item)
+			if !shouldRun(ec, r) {
+				continue
+			}
+			if err := r.run(ctx); err != nil {
+				panic(depsError{err})
+			}
 		}
 		return nil
 	}
 
 	// Composition mode - return Runnable
 	return &serial{items: toRunnables(items)}
-}
-
-// executeSerial runs items sequentially with deduplication.
-func executeSerial(ctx context.Context, items []any) error {
-	ec := getExecContext(ctx)
-
-	// In collect mode, register structure and recurse
-	if ec.mode == modeCollect {
-		ec.plan.PushSerial()
-		defer ec.plan.Pop()
-		for _, item := range items {
-			r := toRunnable(item)
-			if err := r.run(ctx); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// Execute mode - run with deduplication
-	for _, item := range items {
-		r := toRunnable(item)
-		if !shouldRun(ec, r) {
-			continue
-		}
-		if err := r.run(ctx); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (s *serial) run(ctx context.Context) error {
@@ -120,15 +99,16 @@ type parallel struct {
 	items []Runnable
 }
 
-// Parallel has two modes based on whether the first argument is a context.Context:
+// Parallel runs items concurrently.
 //
-// Execution mode (first arg is context.Context):
+// When called during function execution (inside a FuncDef body):
 //
-//	pocket.Parallel(ctx, test1, test2)
+//	pocket.Parallel(test1, test2)
 //
 // Executes items concurrently with deduplication. Panics on error (framework recovers).
+// Uses the implicit execution context set by the engine.
 //
-// Composition mode (first arg is NOT context.Context):
+// When called outside function execution (composition):
 //
 //	pocket.Parallel(task1, task2)
 //
@@ -140,9 +120,54 @@ func Parallel(items ...any) Runnable {
 		return &parallel{items: nil}
 	}
 
-	// Check if first item is context.Context (execution mode)
-	if ctx, ok := items[0].(context.Context); ok {
-		if err := executeParallel(ctx, items[1:]); err != nil {
+	// Check if we're in an active execution context (inside a function body)
+	if ctx, ok := getExecutionContext(); ok {
+		ec := getExecContext(ctx)
+
+		// Execute mode - run concurrently with deduplication
+		var toRun []Runnable
+		for _, item := range items {
+			r := toRunnable(item)
+			if shouldRun(ec, r) {
+				toRun = append(toRun, r)
+			}
+		}
+
+		if len(toRun) == 0 {
+			return nil
+		}
+		if len(toRun) == 1 {
+			if err := toRun[0].run(ctx); err != nil {
+				panic(depsError{err})
+			}
+			return nil
+		}
+
+		buffers := make([]*bufferedOutput, len(toRun))
+		for i := range buffers {
+			buffers[i] = newBufferedOutput(ec.out)
+		}
+
+		g, gCtx := errgroup.WithContext(ctx)
+		for i, r := range toRun {
+			g.Go(func() error {
+				newEC := *ec
+				newEC.out = buffers[i].Output()
+				newCtx := withExecContext(gCtx, &newEC)
+				// Set execution context for the new goroutine
+				setExecutionContext(newCtx)
+				defer clearExecutionContext()
+				return r.run(newCtx)
+			})
+		}
+
+		err := g.Wait()
+
+		for _, buf := range buffers {
+			buf.Flush()
+		}
+
+		if err != nil {
 			panic(depsError{err})
 		}
 		return nil
@@ -150,63 +175,6 @@ func Parallel(items ...any) Runnable {
 
 	// Composition mode - return Runnable
 	return &parallel{items: toRunnables(items)}
-}
-
-// executeParallel runs items concurrently with deduplication.
-func executeParallel(ctx context.Context, items []any) error {
-	ec := getExecContext(ctx)
-
-	// In collect mode, register structure and recurse (sequentially for simplicity)
-	if ec.mode == modeCollect {
-		ec.plan.PushParallel()
-		defer ec.plan.Pop()
-		for _, item := range items {
-			r := toRunnable(item)
-			if err := r.run(ctx); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	// Execute mode - run concurrently with deduplication
-	var toRun []Runnable
-	for _, item := range items {
-		r := toRunnable(item)
-		if shouldRun(ec, r) {
-			toRun = append(toRun, r)
-		}
-	}
-
-	if len(toRun) == 0 {
-		return nil
-	}
-	if len(toRun) == 1 {
-		return toRun[0].run(ctx)
-	}
-
-	buffers := make([]*bufferedOutput, len(toRun))
-	for i := range buffers {
-		buffers[i] = newBufferedOutput(ec.out)
-	}
-
-	g, gCtx := errgroup.WithContext(ctx)
-	for i, r := range toRun {
-		g.Go(func() error {
-			newEC := *ec
-			newEC.out = buffers[i].Output()
-			newCtx := withExecContext(gCtx, &newEC)
-			return r.run(newCtx)
-		})
-	}
-
-	err := g.Wait()
-
-	for _, buf := range buffers {
-		buf.Flush()
-	}
-
-	return err
 }
 
 func (p *parallel) run(ctx context.Context) error {
@@ -254,6 +222,9 @@ func (p *parallel) run(ctx context.Context) error {
 			newEC := *ec
 			newEC.out = buffers[i].Output()
 			newCtx := withExecContext(gCtx, &newEC)
+			// Set execution context for the new goroutine
+			setExecutionContext(newCtx)
+			defer clearExecutionContext()
 			return r.run(newCtx)
 		})
 	}

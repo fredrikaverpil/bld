@@ -17,13 +17,21 @@ func TestSerial_ExecutionMode(t *testing.T) {
 		return nil
 	}
 
-	// Create execution context
+	// Create a FuncDef that uses Serial inside its body
+	testFunc := Func("test", "test", func(_ context.Context) error {
+		// This Serial call should find the implicit execution context
+		Serial(fn1, fn2)
+		return nil
+	})
+
+	// Create execution context and run
 	out := StdOutput()
 	ec := newExecContext(out, ".", false)
 	ctx := withExecContext(context.Background(), ec)
 
-	// Execute in serial - should work with plain functions
-	Serial(ctx, fn1, fn2)
+	if err := testFunc.run(ctx); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
 
 	if len(executed) != 2 {
 		t.Errorf("expected 2 executions, got %d", len(executed))
@@ -45,13 +53,21 @@ func TestParallel_ExecutionMode(t *testing.T) {
 		return nil
 	}
 
-	// Create execution context
+	// Create a FuncDef that uses Parallel inside its body
+	testFunc := Func("test", "test", func(_ context.Context) error {
+		// This Parallel call should find the implicit execution context
+		Parallel(fn1, fn2)
+		return nil
+	})
+
+	// Create execution context and run
 	out := StdOutput()
 	ec := newExecContext(out, ".", false)
 	ctx := withExecContext(context.Background(), ec)
 
-	// Execute in parallel - should work with plain functions
-	Parallel(ctx, fn1, fn2)
+	if err := testFunc.run(ctx); err != nil {
+		t.Fatalf("run failed: %v", err)
+	}
 
 	close(executed)
 	results := make([]string, 0, 2)

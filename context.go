@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -44,6 +47,54 @@ func (d *dedupState) shouldRun(key uintptr) bool {
 	}
 	d.executed[key] = true
 	return true
+}
+
+// Goroutine-local execution context storage.
+// This enables Serial/Parallel to work without explicit ctx parameter,
+// similar to Mage's mg.Deps/mg.SerialDeps pattern.
+var (
+	execCtxMu  sync.Mutex
+	execCtxMap = make(map[uint64]context.Context)
+)
+
+// goroutineID returns the current goroutine's ID.
+// Uses runtime.Stack to extract the ID from the stack trace.
+func goroutineID() uint64 {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	// Stack trace starts with "goroutine <id> ["
+	s := string(buf[:n])
+	s = strings.TrimPrefix(s, "goroutine ")
+	if idx := strings.Index(s, " "); idx >= 0 {
+		s = s[:idx]
+	}
+	id, _ := strconv.ParseUint(s, 10, 64)
+	return id
+}
+
+// setExecutionContext stores the current execution context for this goroutine.
+// Called by FuncDef.run() before executing function bodies.
+func setExecutionContext(ctx context.Context) {
+	execCtxMu.Lock()
+	execCtxMap[goroutineID()] = ctx
+	execCtxMu.Unlock()
+}
+
+// clearExecutionContext removes the execution context for this goroutine.
+// Called by FuncDef.run() after executing function bodies.
+func clearExecutionContext() {
+	execCtxMu.Lock()
+	delete(execCtxMap, goroutineID())
+	execCtxMu.Unlock()
+}
+
+// getExecutionContext retrieves the execution context for this goroutine.
+// Returns the context and true if found, or nil and false if not in execution.
+func getExecutionContext() (context.Context, bool) {
+	execCtxMu.Lock()
+	ctx, ok := execCtxMap[goroutineID()]
+	execCtxMu.Unlock()
+	return ctx, ok
 }
 
 // contextKey is the type for context keys to avoid collisions.

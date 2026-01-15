@@ -18,7 +18,7 @@ var Format = pocket.Func("md-format", "format Markdown files", format).
 	With(FormatOptions{})
 
 func format(ctx context.Context) error {
-	pocket.Serial(ctx, prettier.Install)
+	pocket.Serial(prettier.Install)
 
 	opts := pocket.Options[FormatOptions](ctx)
 

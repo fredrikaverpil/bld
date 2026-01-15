@@ -102,7 +102,7 @@ var Lint = pocket.Func("lint", "run linter", lint)
 
 func lint(ctx context.Context) error {
     // Ensure tool is installed (runs once, even if called multiple times)
-    pocket.Serial(ctx, Install)
+    pocket.Serial(Install)
     return pocket.Exec(ctx, "tool", "lint", "./...")
 }
 ```
@@ -141,22 +141,24 @@ Commands run with proper output handling and respect the current path context.
 
 ### Serial and Parallel
 
-These have two modes based on the first argument:
+Use `Serial` and `Parallel` to compose functions:
 
-**Composition mode** (no context) - returns a Runnable. Used in your
-`.pocket/config.go`:
+**Composition** - returns a Runnable. Used in your `.pocket/config.go`:
 
 ```go
 pocket.Serial(fn1, fn2, fn3)    // run in sequence
 pocket.Parallel(fn1, fn2, fn3)  // run concurrently
 ```
 
-**Execution mode** (with context) - runs immediately, used in tools and tasks:
+**Inside function bodies** - runs dependencies immediately:
 
 ```go
-pocket.Serial(ctx, fn1, fn2)    // run dependencies in sequence
-pocket.Parallel(ctx, fn1, fn2)  // run dependencies concurrently
+pocket.Serial(fn1, fn2)    // run dependencies in sequence
+pocket.Parallel(fn1, fn2)  // run dependencies concurrently
 ```
+
+When called inside a function body, `Serial` and `Parallel` detect the active
+execution context automatically and run dependencies immediately.
 
 > [!NOTE]
 >
@@ -211,7 +213,7 @@ package python
 var Lint = pocket.Func("py-lint", "lint Python files", lint)
 
 func lint(ctx context.Context) error {
-    pocket.Serial(ctx, ruff.Install)  // ensure tool is installed
+    pocket.Serial(ruff.Install)  // ensure tool is installed
     return pocket.Exec(ctx, ruff.Name, "check", ".")  // run via Name constant
 }
 ```
