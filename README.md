@@ -288,6 +288,23 @@ pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).Except("vendor")
 pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).In("services/.*").Except("testdata")
 ```
 
+### Skipping Tasks in Specific Paths
+
+While `Except()` excludes entire workflows from directories, use `SkipTask()` to
+skip specific tasks within a workflow:
+
+```go
+var Config = pocket.Config{
+    AutoRun: pocket.Paths(golang.Workflow()).
+        DetectBy(golang.Detect()).
+        SkipTask(golang.Test, "tests/go", "tests/features").  // skip in specific dirs
+        SkipTask(golang.Vulncheck),  // skip everywhere (no paths = skip all)
+}
+```
+
+This runs the full Go workflow in detected directories, but skips `go-test` in
+`tests/go` and `tests/features`, and skips `go-vulncheck` everywhere.
+
 ## Options
 
 Functions can accept options:
@@ -351,7 +368,10 @@ pocket.ConfigPath("tool", config)              // find/create config file
 ```go
 var Config = pocket.Config{
     // AutoRun: runs on ./pok (no arguments)
-    AutoRun: pocket.Serial(...),
+    // Use SkipTask() to skip specific tasks in specific paths
+    AutoRun: pocket.Paths(golang.Workflow()).
+        DetectBy(golang.Detect()).
+        SkipTask(golang.Test, "tests/go"),
 
     // ManualRun: requires ./pok <name>
     ManualRun: []pocket.Runnable{...},

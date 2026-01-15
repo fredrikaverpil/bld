@@ -140,6 +140,11 @@ func (f *FuncDef) run(ctx context.Context) error {
 		return nil
 	}
 
+	// Check skip rules before executing
+	if ec.shouldSkipTask(f.name) {
+		return nil
+	}
+
 	// Execute mode - print task header (skip for hidden tasks)
 	if !f.hidden {
 		printTaskHeader(ctx, f.name)

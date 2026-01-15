@@ -16,10 +16,11 @@ func Paths(r Runnable) *PathFilter {
 // PathFilter wraps a Runnable with path filtering.
 // It implements Runnable, so it can be used anywhere a Runnable is expected.
 type PathFilter struct {
-	inner   Runnable
-	include []*regexp.Regexp // explicit include patterns
-	exclude []*regexp.Regexp // exclusion patterns
-	detect  func() []string  // detection function (nil = no detection)
+	inner     Runnable
+	include   []*regexp.Regexp    // explicit include patterns
+	exclude   []*regexp.Regexp    // exclusion patterns
+	detect    func() []string     // detection function (nil = no detection)
+	skipTasks map[string][]string // task name -> paths to skip in (empty = skip everywhere)
 }
 
 // In adds include patterns (regexp).
@@ -50,6 +51,26 @@ func (p *PathFilter) Except(patterns ...string) *PathFilter {
 func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 	cp := p.clone()
 	cp.detect = fn
+	return cp
+}
+
+// SkipTask configures a task to be skipped in specific paths.
+// If no paths are specified, the task is skipped everywhere within this PathFilter.
+// Paths support regex patterns matched against the current execution path.
+// Returns a new *PathFilter (immutable).
+//
+// Example:
+//
+//	pocket.Paths(golang.Workflow()).
+//	    DetectBy(golang.Detect()).
+//	    SkipTask(golang.Test, "tests/go", "tests/features").
+//	    SkipTask(golang.Vulncheck)  // skip everywhere
+func (p *PathFilter) SkipTask(task *FuncDef, paths ...string) *PathFilter {
+	cp := p.clone()
+	if cp.skipTasks == nil {
+		cp.skipTasks = make(map[string][]string)
+	}
+	cp.skipTasks[task.Name()] = append(cp.skipTasks[task.Name()], paths...)
 	return cp
 }
 
@@ -128,12 +149,42 @@ func (p *PathFilter) run(ctx context.Context) error {
 		// Create context with the current path
 		pathCtx := withPath(ctx, path)
 
+		// Merge skip rules from this PathFilter into context
+		if len(p.skipTasks) > 0 {
+			pathCtx = p.mergeSkipRules(pathCtx)
+		}
+
 		// Run inner runnable
 		if err := p.inner.run(pathCtx); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// mergeSkipRules merges this PathFilter's skip rules into the context.
+func (p *PathFilter) mergeSkipRules(ctx context.Context) context.Context {
+	ec := getExecContext(ctx)
+	newEC := *ec
+
+	// Create or clone the skip rules map
+	if newEC.skipRules == nil {
+		newEC.skipRules = make(map[string][]string, len(p.skipTasks))
+	} else {
+		// Clone to avoid mutating the original
+		newSkipRules := make(map[string][]string, len(newEC.skipRules)+len(p.skipTasks))
+		for k, v := range newEC.skipRules {
+			newSkipRules[k] = v
+		}
+		newEC.skipRules = newSkipRules
+	}
+
+	// Add this PathFilter's skip rules
+	for taskName, paths := range p.skipTasks {
+		newEC.skipRules[taskName] = append(newEC.skipRules[taskName], paths...)
+	}
+
+	return withExecContext(ctx, &newEC)
 }
 
 // funcs returns all functions from the inner Runnable.
@@ -143,12 +194,19 @@ func (p *PathFilter) funcs() []*FuncDef {
 
 // clone creates a shallow copy of PathFilter for immutability.
 func (p *PathFilter) clone() *PathFilter {
-	return &PathFilter{
+	cp := &PathFilter{
 		inner:   p.inner,
 		include: slices.Clone(p.include),
 		exclude: slices.Clone(p.exclude),
 		detect:  p.detect,
 	}
+	if p.skipTasks != nil {
+		cp.skipTasks = make(map[string][]string, len(p.skipTasks))
+		for k, v := range p.skipTasks {
+			cp.skipTasks[k] = slices.Clone(v)
+		}
+	}
+	return cp
 }
 
 // matches checks if a directory matches the include patterns.

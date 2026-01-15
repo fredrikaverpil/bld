@@ -3,20 +3,23 @@ package pocket
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"sync"
 )
 
 // execContext holds runtime state for function execution.
 // Stored in context.Context and accessed via helper functions.
 type execContext struct {
-	mode    execMode       // execution mode (execute or collect)
-	plan    *ExecutionPlan // plan being collected (only in modeCollect)
-	out     *Output        // where to write output
-	path    string         // current path for this invocation
-	cwd     string         // where CLI was invoked (relative to git root)
-	verbose bool           // verbose mode enabled
-	dedup   *dedupState    // shared deduplication state (thread-safe)
+	mode      execMode           // execution mode (execute or collect)
+	plan      *ExecutionPlan     // plan being collected (only in modeCollect)
+	out       *Output            // where to write output
+	path      string             // current path for this invocation
+	cwd       string             // where CLI was invoked (relative to git root)
+	verbose   bool               // verbose mode enabled
+	dedup     *dedupState        // shared deduplication state (thread-safe)
+	skipRules map[string][]string // task name -> paths to skip in (empty = skip everywhere)
 }
 
 // dedupState tracks executed runnables for deduplication.
@@ -234,4 +237,55 @@ func Errorf(ctx context.Context, format string, args ...any) {
 func TestContext(out *Output) context.Context {
 	ec := newExecContext(out, ".", false)
 	return withExecContext(context.Background(), ec)
+}
+
+// shouldSkipTask checks if a task should be skipped based on skip rules.
+// Returns true if the task should be skipped for the current path.
+func (ec *execContext) shouldSkipTask(taskName string) bool {
+	if ec.skipRules == nil {
+		return false
+	}
+	paths, exists := ec.skipRules[taskName]
+	if !exists {
+		return false
+	}
+
+	// Empty paths means skip everywhere
+	if len(paths) == 0 {
+		return true
+	}
+
+	// Check if current path matches any skip pattern
+	currentPath := ec.path
+	if currentPath == "" {
+		currentPath = "."
+	}
+	for _, pattern := range paths {
+		if matchSkipPath(currentPath, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchSkipPath checks if the current path matches the skip pattern.
+// Supports exact matches and regex patterns.
+func matchSkipPath(currentPath, pattern string) bool {
+	// Clean paths for comparison
+	currentPath = filepath.Clean(currentPath)
+	pattern = filepath.Clean(pattern)
+
+	// Try exact match first
+	if currentPath == pattern {
+		return true
+	}
+
+	// Try as regex pattern
+	re, err := regexp.Compile("^" + pattern + "$")
+	if err != nil {
+		// Invalid regex, treat as literal
+		return false
+	}
+
+	return re.MatchString(currentPath)
 }
