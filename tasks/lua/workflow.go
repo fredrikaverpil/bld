@@ -10,17 +10,11 @@ type Option func(*config)
 
 type config struct {
 	format FormatOptions
-	lint   LintOptions
 }
 
 // WithFormat sets options for the lua-format task.
 func WithFormat(opts FormatOptions) Option {
 	return func(c *config) { c.format = opts }
-}
-
-// WithLint sets options for the lua-lint task.
-func WithLint(opts LintOptions) Option {
-	return func(c *config) { c.lint = opts }
 }
 
 // Workflow returns a Runnable that executes all Lua tasks.
@@ -33,7 +27,6 @@ func WithLint(opts LintOptions) Option {
 //
 //	pocket.Paths(lua.Workflow(
 //	    lua.WithFormat(lua.FormatOptions{StyluaConfig: ".stylua.toml"}),
-//	    lua.WithLint(lua.LintOptions{StyluaConfig: ".stylua.toml"}),
 //	)).DetectBy(lua.Detect())
 func Workflow(opts ...Option) pocket.Runnable {
 	var cfg config
@@ -46,12 +39,7 @@ func Workflow(opts ...Option) pocket.Runnable {
 		formatTask = Format.With(cfg.format)
 	}
 
-	lintTask := Lint
-	if cfg.lint != (LintOptions{}) {
-		lintTask = Lint.With(cfg.lint)
-	}
-
-	return pocket.Serial(formatTask, lintTask)
+	return pocket.Serial(formatTask)
 }
 
 // Detect returns a detection function that finds Lua projects.
