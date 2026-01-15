@@ -12,7 +12,7 @@ import (
 var Config = pocket.Config{
 	AutoRun: pocket.Serial(
 		pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()),
-		pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect()),
+		pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect()).Except("\\..+"),
 	),
 	ManualRun: []pocket.Runnable{
 		Greet,
@@ -26,7 +26,7 @@ var Config = pocket.Config{
 
 // GreetOptions defines the options for the greet task.
 type GreetOptions struct {
-	Name  string `arg:"name" usage:"name to greet"`
+	Name  string `arg:"name"  usage:"name to greet"`
 	Count int    `arg:"count" usage:"number of times to greet"`
 }
 
