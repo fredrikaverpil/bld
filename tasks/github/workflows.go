@@ -22,7 +22,6 @@ type WorkflowsOptions struct {
 	SkipPR      bool `arg:"skip-pr"      usage:"exclude PR workflow"`
 	SkipRelease bool `arg:"skip-release" usage:"exclude release-please workflow"`
 	SkipStale   bool `arg:"skip-stale"   usage:"exclude stale workflow"`
-	Force       bool `arg:"force"        usage:"overwrite existing workflow files"`
 }
 
 // PocketConfig holds configuration for the pocket workflow template.
@@ -100,14 +99,6 @@ func workflows(ctx context.Context) error {
 
 		destPath := filepath.Join(workflowDir, wf.outFile)
 
-		// Check if file already exists
-		if _, err := os.Stat(destPath); err == nil && !opts.Force {
-			if verbose {
-				pocket.Printf(ctx, "  %s (already exists, skipping)\n", wf.outFile)
-			}
-			continue
-		}
-
 		// Read and parse template
 		tmplContent, err := workflowTemplates.ReadFile(filepath.Join("workflows", wf.tmplFile))
 		if err != nil {
@@ -140,9 +131,7 @@ func workflows(ctx context.Context) error {
 		copied++
 	}
 
-	if copied == 0 {
-		pocket.Println(ctx, "  All workflows already exist (use -force to overwrite)")
-	} else {
+	if copied > 0 {
 		pocket.Printf(ctx, "  Bootstrapped %d workflow(s)\n", copied)
 	}
 

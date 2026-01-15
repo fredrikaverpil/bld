@@ -14,7 +14,7 @@ var Config = pocket.Config{
 	AutoRun: pocket.Serial(
 		pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()),
 		pocket.Paths(markdown.Workflow()).DetectBy(markdown.Detect()),
-		github.Workflows.With(github.WorkflowsOptions{Force: true, SkipPocket: true}),
+		github.Workflows.With(github.WorkflowsOptions{SkipPocket: true}),
 	),
 	ManualRun: []pocket.Runnable{
 		Greet,
