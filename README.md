@@ -143,22 +143,23 @@ Commands run with proper output handling and respect the current path context.
 
 Use `Serial` and `Parallel` to compose functions:
 
-**Composition** - returns a Runnable. Used in your `.pocket/config.go`:
-
 ```go
 pocket.Serial(fn1, fn2, fn3)    // run in sequence
 pocket.Parallel(fn1, fn2, fn3)  // run concurrently
 ```
 
-**Inside function bodies** - runs dependencies immediately:
+**With dependencies** - compose install dependencies into your function:
 
 ```go
-pocket.Serial(fn1, fn2)    // run dependencies in sequence
-pocket.Parallel(fn1, fn2)  // run dependencies concurrently
-```
+var Lint = pocket.Func("lint", "run linter", pocket.Serial(
+    linter.Install,  // runs first
+    lint,            // then the actual linting
+))
 
-When called inside a function body, `Serial` and `Parallel` detect the active
-execution context automatically and run dependencies immediately.
+func lint(ctx context.Context) error {
+    return pocket.Exec(ctx, linter.Name, "run", "./...")
+}
+```
 
 > [!NOTE]
 >
@@ -210,10 +211,12 @@ A task package provides related functions that use tools:
 // tasks/python/lint.go
 package python
 
-var Lint = pocket.Func("py-lint", "lint Python files", lint)
+var Lint = pocket.Func("py-lint", "lint Python files", pocket.Serial(
+    ruff.Install,  // ensure tool is installed first
+    lint,
+))
 
 func lint(ctx context.Context) error {
-    pocket.Serial(ruff.Install)  // ensure tool is installed
     return pocket.Exec(ctx, ruff.Name, "check", ".")  // run via Name constant
 }
 ```

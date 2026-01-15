@@ -7,55 +7,28 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// depsError wraps an error from Serial/Parallel execution mode.
-// The framework recovers this panic and converts it to an error.
-type depsError struct {
-	err error
-}
-
 // serial executes items sequentially.
 type serial struct {
 	items []Runnable
 }
 
-// Serial runs items sequentially.
+// Serial composes items to run sequentially.
 //
-// When called during function execution (inside a FuncDef body):
-//
-//	pocket.Serial(install1, install2)
-//
-// Executes items sequentially with deduplication. Panics on error (framework recovers).
-// Uses the implicit execution context set by the engine.
-//
-// When called outside function execution (composition):
-//
-//	pocket.Serial(task1, task2, task3)
-//
-// Returns a Runnable for use in Config or nested composition.
+// Returns a Runnable that executes items in order. Use it to:
+//   - Define dependencies: Serial(Install, TaskImpl)
+//   - Compose tasks in Config: Serial(Format, Lint, Test)
 //
 // Items can be *FuncDef, Runnable, or func(context.Context) error.
+//
+// Example:
+//
+//	var Lint = pocket.Func("lint", "run linter", pocket.Serial(
+//	    golangcilint.Install,
+//	    func(ctx context.Context) error {
+//	        return pocket.Exec(ctx, "golangci-lint", "run", "./...")
+//	    },
+//	))
 func Serial(items ...any) Runnable {
-	if len(items) == 0 {
-		return &serial{items: nil}
-	}
-
-	// Check if we're in an active execution context (inside a function body)
-	if ctx, ok := getExecutionContext(); ok {
-		ec := getExecContext(ctx)
-		// Execute mode - run with deduplication
-		for _, item := range items {
-			r := toRunnable(item)
-			if !shouldRun(ec, r) {
-				continue
-			}
-			if err := r.run(ctx); err != nil {
-				panic(depsError{err})
-			}
-		}
-		return nil
-	}
-
-	// Composition mode - return Runnable
 	return &serial{items: toRunnables(items)}
 }
 
@@ -99,81 +72,21 @@ type parallel struct {
 	items []Runnable
 }
 
-// Parallel runs items concurrently.
+// Parallel composes items to run concurrently.
 //
-// When called during function execution (inside a FuncDef body):
-//
-//	pocket.Parallel(test1, test2)
-//
-// Executes items concurrently with deduplication. Panics on error (framework recovers).
-// Uses the implicit execution context set by the engine.
-//
-// When called outside function execution (composition):
-//
-//	pocket.Parallel(task1, task2)
-//
-// Returns a Runnable for use in Config or nested composition.
+// Returns a Runnable that executes items in parallel. Use it to:
+//   - Run independent tasks concurrently: Parallel(Lint, Test)
+//   - Compose in Config: Parallel(task1, task2)
 //
 // Items can be *FuncDef, Runnable, or func(context.Context) error.
+//
+// Example:
+//
+//	var CI = pocket.Func("ci", "run CI", pocket.Parallel(
+//	    Lint,
+//	    Test,
+//	))
 func Parallel(items ...any) Runnable {
-	if len(items) == 0 {
-		return &parallel{items: nil}
-	}
-
-	// Check if we're in an active execution context (inside a function body)
-	if ctx, ok := getExecutionContext(); ok {
-		ec := getExecContext(ctx)
-
-		// Execute mode - run concurrently with deduplication
-		var toRun []Runnable
-		for _, item := range items {
-			r := toRunnable(item)
-			if shouldRun(ec, r) {
-				toRun = append(toRun, r)
-			}
-		}
-
-		if len(toRun) == 0 {
-			return nil
-		}
-		if len(toRun) == 1 {
-			if err := toRun[0].run(ctx); err != nil {
-				panic(depsError{err})
-			}
-			return nil
-		}
-
-		buffers := make([]*bufferedOutput, len(toRun))
-		for i := range buffers {
-			buffers[i] = newBufferedOutput(ec.out)
-		}
-
-		g, gCtx := errgroup.WithContext(ctx)
-		for i, r := range toRun {
-			g.Go(func() error {
-				newEC := *ec
-				newEC.out = buffers[i].Output()
-				newCtx := withExecContext(gCtx, &newEC)
-				// Set execution context for the new goroutine
-				setExecutionContext(newCtx)
-				defer clearExecutionContext()
-				return r.run(newCtx)
-			})
-		}
-
-		err := g.Wait()
-
-		for _, buf := range buffers {
-			buf.Flush()
-		}
-
-		if err != nil {
-			panic(depsError{err})
-		}
-		return nil
-	}
-
-	// Composition mode - return Runnable
 	return &parallel{items: toRunnables(items)}
 }
 
@@ -222,9 +135,6 @@ func (p *parallel) run(ctx context.Context) error {
 			newEC := *ec
 			newEC.out = buffers[i].Output()
 			newCtx := withExecContext(gCtx, &newEC)
-			// Set execution context for the new goroutine
-			setExecutionContext(newCtx)
-			defer clearExecutionContext()
 			return r.run(newCtx)
 		})
 	}

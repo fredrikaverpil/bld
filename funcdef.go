@@ -132,19 +132,8 @@ func (f *FuncDef) Run(ctx context.Context) error {
 
 // run executes this function with the given context.
 // This is called by the framework - users should not call this directly.
-func (f *FuncDef) run(ctx context.Context) (err error) {
+func (f *FuncDef) run(ctx context.Context) error {
 	ec := getExecContext(ctx)
-
-	// Recover from depsError panics (from Serial/Parallel execution mode)
-	defer func() {
-		if r := recover(); r != nil {
-			if de, ok := r.(depsError); ok {
-				err = de.err
-			} else {
-				panic(r) // re-panic for other panics
-			}
-		}
-	}()
 
 	// In collect mode, register function and collect nested deps from static tree
 	if ec.mode == modeCollect {
@@ -170,10 +159,6 @@ func (f *FuncDef) run(ctx context.Context) (err error) {
 	if f.opts != nil {
 		ctx = withOptions(ctx, f.name, f.opts)
 	}
-
-	// Set execution context for this goroutine so Serial/Parallel can find it
-	setExecutionContext(ctx)
-	defer clearExecutionContext()
 
 	// Execute either the plain function or the Runnable body
 	if f.fn != nil {

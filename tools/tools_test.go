@@ -50,14 +50,13 @@ func TestTools(t *testing.T) {
 			ctx := pocket.TestContext(out)
 
 			// Create a test function that installs and runs the tool.
-			// This is needed because Serial() requires an active execution context.
-			testFunc := pocket.Func("test:"+tool.name, "test "+tool.name, func(fnCtx context.Context) error {
-				// Install the tool.
-				pocket.Serial(tool.install)
-
-				// Run the tool to verify it works.
-				return pocket.Exec(fnCtx, tool.binary, tool.versionArgs...)
-			})
+			// Compose the install dependency with the version check.
+			testFunc := pocket.Func("test:"+tool.name, "test "+tool.name, pocket.Serial(
+				tool.install,
+				func(fnCtx context.Context) error {
+					return pocket.Exec(fnCtx, tool.binary, tool.versionArgs...)
+				},
+			))
 
 			if err := testFunc.Run(ctx); err != nil {
 				t.Fatalf("failed: %v", err)
