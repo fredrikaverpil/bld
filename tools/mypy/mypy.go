@@ -27,7 +27,7 @@ var Install = pocket.Func("install:mypy", "install mypy", pocket.Serial(
 
 func install(ctx context.Context) error {
 	venvDir := pocket.FromToolsDir("mypy", Version)
-	binary := pocket.VenvBinaryPath(venvDir, "mypy")
+	binary := uv.BinaryPath(venvDir, "mypy")
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {

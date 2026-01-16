@@ -41,7 +41,7 @@ var Install = pocket.Func("install:mdformat", "install mdformat", pocket.Serial(
 func install(ctx context.Context) error {
 	// Use hash-based versioning: .pocket/tools/mdformat/<hash>/
 	venvDir := pocket.FromToolsDir("mdformat", Version())
-	binary := pocket.VenvBinaryPath(venvDir, "mdformat")
+	binary := uv.BinaryPath(venvDir, "mdformat")
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {

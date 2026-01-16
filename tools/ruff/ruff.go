@@ -38,7 +38,7 @@ var Install = pocket.Func("install:ruff", "install ruff", pocket.Serial(
 
 func install(ctx context.Context) error {
 	venvDir := pocket.FromToolsDir("ruff", Version)
-	binary := pocket.VenvBinaryPath(venvDir, "ruff")
+	binary := uv.BinaryPath(venvDir, "ruff")
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {

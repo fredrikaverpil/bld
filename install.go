@@ -173,14 +173,6 @@ func isGoVersion(s string) bool {
 	return true
 }
 
-// VenvBinaryPath returns the cross-platform path to a binary in a Python venv.
-func VenvBinaryPath(venvDir, name string) string {
-	if runtime.GOOS == Windows {
-		return filepath.Join(venvDir, "Scripts", name+".exe")
-	}
-	return filepath.Join(venvDir, "bin", name)
-}
-
 // CreateSymlink creates a symlink in .pocket/bin/ pointing to the given binary.
 // On Windows, it copies the file instead since symlinks require admin privileges.
 // Returns the path to the symlink (or copy on Windows).

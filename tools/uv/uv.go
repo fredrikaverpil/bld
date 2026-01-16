@@ -73,6 +73,16 @@ func venvPython(venvPath string) string {
 	return filepath.Join(venvPath, "bin", "python")
 }
 
+// BinaryPath returns the cross-platform path to a binary in a Python venv.
+// On Windows, binaries are in Scripts/ with .exe extension.
+// On Unix, binaries are in bin/ without extension.
+func BinaryPath(venvDir, name string) string {
+	if runtime.GOOS == pocket.Windows {
+		return filepath.Join(venvDir, "Scripts", name+".exe")
+	}
+	return filepath.Join(venvDir, "bin", name)
+}
+
 func platformArch() string {
 	switch runtime.GOOS {
 	case pocket.Darwin:

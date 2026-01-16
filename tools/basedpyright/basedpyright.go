@@ -27,7 +27,7 @@ var Install = pocket.Func("install:basedpyright", "install basedpyright", pocket
 
 func install(ctx context.Context) error {
 	venvDir := pocket.FromToolsDir("basedpyright", Version)
-	binary := pocket.VenvBinaryPath(venvDir, "basedpyright")
+	binary := uv.BinaryPath(venvDir, "basedpyright")
 
 	// Skip if already installed.
 	if _, err := os.Stat(binary); err == nil {
