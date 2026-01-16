@@ -102,14 +102,14 @@ Functions can depend on other functions. Dependencies are deduplicated
 automatically - each function runs at most once per execution.
 
 ```go
-var Install = pocket.Func("install:tool", "install tool", install).Hidden()
-var Lint = pocket.Func("lint", "run linter", lint)
+var Install = pocket.Func("install:tool", "install tool",
+    pocket.InstallGo("github.com/org/tool", "v1.0.0"),
+).Hidden()
 
-func lint(ctx context.Context) error {
-    // Ensure tool is installed (runs once, even if called multiple times)
-    pocket.Serial(Install)
-    return pocket.Exec(ctx, "tool", "lint", "./...")
-}
+var Lint = pocket.Func("lint", "run linter", pocket.Serial(
+    Install,  // runs first (deduplicated across the tree)
+    pocket.Run("tool", "lint", "./..."),
+))
 ```
 
 ## Concepts
@@ -121,11 +121,28 @@ the building block - they become **tasks** when exposed via CLI, or **tools**
 when they install binaries:
 
 ```go
-var MyFunc = pocket.Func("name", "description", implementation)
+// Simple: static command
+var MyFunc = pocket.Func("name", "description",
+    pocket.Run("cmd", "arg1", "arg2"),
+)
 
-func implementation(ctx context.Context) error {
-    // do work
-    return nil
+// Composed: multiple steps
+var Build = pocket.Func("build", "build the project", pocket.Serial(
+    Install,
+    pocket.Run("go", "build", "./..."),
+))
+
+// Dynamic: args computed at runtime
+var Lint = pocket.Func("lint", "run linter", lintCmd())
+
+func lintCmd() pocket.Runnable {
+    return pocket.RunWith("golangci-lint", func(ctx context.Context) []string {
+        args := []string{"run"}
+        if pocket.Verbose(ctx) {
+            args = append(args, "-v")
+        }
+        return args
+    })
 }
 ```
 
@@ -136,19 +153,41 @@ Functions can be:
 
 ### Executing Commands
 
-Use `pocket.Exec()` to run system commands in your `pocket.Func` functions:
+Pocket provides three ways to run external commands:
+
+**`Run(name, args...)`** - Static command with fixed arguments:
 
 ```go
-func format(ctx context.Context) error {
-    return pocket.Exec(ctx, "go", "fmt", "./...")
-}
+pocket.Run("go", "fmt", "./...")
 ```
 
-Commands run with proper output handling and respect the current path context.
+**`RunWith(name, argsFn)`** - Dynamic arguments computed at runtime:
+
+```go
+pocket.RunWith("go", func(ctx context.Context) []string {
+    args := []string{"test"}
+    if pocket.Verbose(ctx) {
+        args = append(args, "-v")
+    }
+    return args
+})
+```
+
+**`Do(fn)`** - Escape hatch for arbitrary Go code:
+
+```go
+pocket.Do(func(ctx context.Context) error {
+    // complex logic, file I/O, multiple commands
+    return nil
+})
+```
+
+All commands run with proper output handling and respect the current path
+context. They're no-ops in collect mode (plan generation).
 
 ### Serial and Parallel
 
-Use `Serial` and `Parallel` to compose functions:
+Use `Serial` and `Parallel` to compose Runnables:
 
 ```go
 pocket.Serial(fn1, fn2, fn3)    // run in sequence
@@ -159,12 +198,18 @@ pocket.Parallel(fn1, fn2, fn3)  // run concurrently
 
 ```go
 var Lint = pocket.Func("lint", "run linter", pocket.Serial(
-    linter.Install,  // runs first
-    lint,            // then the actual linting
+    linter.Install,  // runs first (deduplicated)
+    lintCmd(),       // then the actual linting
 ))
 
-func lint(ctx context.Context) error {
-    return pocket.Exec(ctx, linter.Name, "run", "./...")
+func lintCmd() pocket.Runnable {
+    return pocket.RunWith(linter.Name, func(ctx context.Context) []string {
+        args := []string{"run"}
+        if pocket.Verbose(ctx) {
+            args = append(args, "-v")
+        }
+        return args
+    })
 }
 ```
 
@@ -185,29 +230,47 @@ use those binaries to do work.
 
 A tool package ensures a binary is available. It exports:
 
-- `Name` - the binary name (used with `pocket.Exec`)
+- `Name` - the binary name (used with `pocket.Run`)
 - `Install` - a hidden function that downloads/installs the binary
 - `Config` (optional) - configuration file lookup settings
 
 ```go
-// tools/ruff/ruff.go
-package ruff
+// tools/golangcilint/golangcilint.go
+package golangcilint
 
-const Name = "ruff"
-const Version = "0.14.0"
+const Name = "golangci-lint"
+const Version = "v2.0.2"
 
-var Install = pocket.Func("install:ruff", "install ruff", install).Hidden()
+// For Go tools: use InstallGo directly
+var Install = pocket.Func("install:golangci-lint", "install golangci-lint",
+    pocket.InstallGo("github.com/golangci/golangci-lint/v2/cmd/golangci-lint", Version),
+).Hidden()
 
 var Config = pocket.ToolConfig{
-    UserFiles:   []string{"ruff.toml", ".ruff.toml", "pyproject.toml"},
-    DefaultFile: "ruff.toml",
+    UserFiles:   []string{".golangci.yml", ".golangci.yaml", ".golangci.toml"},
+    DefaultFile: ".golangci.yml",
     DefaultData: defaultConfig,
 }
+```
 
-func install(ctx context.Context) error {
-    // Download and install ruff to .pocket/bin/
-    // ...
-}
+For tools with complex installation (downloads, extraction):
+
+```go
+// tools/stylua/stylua.go
+package stylua
+
+const Name = "stylua"
+const Version = "v2.0.2"
+
+var Install = pocket.Func("install:stylua", "install stylua",
+    pocket.Download(downloadURL(),
+        pocket.WithDestDir(destDir()),
+        pocket.WithFormat(pocket.DefaultArchiveFormat()),
+        pocket.WithExtract(pocket.WithExtractFile(pocket.BinaryName(Name))),
+        pocket.WithSymlink(),
+        pocket.WithSkipIfExists(binaryPath()),
+    ),
+).Hidden()
 ```
 
 #### 2. Task Package
@@ -215,31 +278,41 @@ func install(ctx context.Context) error {
 A task package provides related functions that use tools:
 
 ```go
-// tasks/python/lint.go
-package python
+// tasks/golang/lint.go
+package golang
 
-var Lint = pocket.Func("py-lint", "lint Python files", pocket.Serial(
-    ruff.Install,  // ensure tool is installed first
-    lint,
-))
+var Lint = pocket.Func("go-lint", "run golangci-lint", pocket.Serial(
+    golangcilint.Install,  // ensure tool is installed first
+    lintCmd(),             // then run linting
+)).With(LintOptions{})
 
-func lint(ctx context.Context) error {
-    return pocket.Exec(ctx, ruff.Name, "check", ".")  // run via Name constant
+func lintCmd() pocket.Runnable {
+    return pocket.RunWith(golangcilint.Name, func(ctx context.Context) []string {
+        opts := pocket.Options[LintOptions](ctx)
+        args := []string{"run"}
+        if pocket.Verbose(ctx) {
+            args = append(args, "-v")
+        }
+        if !opts.SkipFix {
+            args = append(args, "--fix")
+        }
+        return args
+    })
 }
 ```
 
 The `Tasks()` function composes tasks, and `Detect()` enables auto-discovery:
 
 ```go
-// tasks/python/workflow.go
-package python
+// tasks/golang/workflow.go
+package golang
 
 func Tasks() pocket.Runnable {
-    return pocket.Serial(Format, Lint)
+    return pocket.Serial(Format, Lint, Test)
 }
 
 func Detect() func() []string {
-    return func() []string { return pocket.DetectByFile("pyproject.toml") }
+    return func() []string { return pocket.DetectByFile("go.mod") }
 }
 ```
 
@@ -396,7 +469,12 @@ func deploy(ctx context.Context) error {
 pocket.Serial(fn1, fn2, fn3)     // run in sequence
 pocket.Parallel(fn1, fn2, fn3)   // run concurrently
 
-// Execution
+// Command execution (returns Runnable)
+pocket.Run("cmd", "arg1", "arg2")                  // static command
+pocket.RunWith("cmd", func(ctx) []string)          // dynamic arguments
+pocket.Do(func(ctx) error)                         // arbitrary Go code
+
+// Lower-level execution (inside Do() closures)
 pocket.Exec(ctx, "cmd", "arg1", "arg2")       // run command in current path
 pocket.ExecIn(ctx, "dir", "cmd", "args"...)   // run command in specific dir
 pocket.Command(ctx, "cmd", "args"...)         // create exec.Cmd with .pocket/bin in PATH
@@ -421,13 +499,15 @@ pocket.BinaryName("tool")     // append .exe on Windows
 pocket.DetectByFile("go.mod")       // find dirs containing file
 pocket.DetectByExtension(".lua")    // find dirs with file extension
 
-// Installation
-pocket.InstallGo(ctx, "github.com/org/tool", "v1.0.0")  // go install
-pocket.CreateSymlink("path/to/binary")                  // symlink to .pocket/bin/
-pocket.ConfigPath(ctx, "tool", config)                   // find/create config file
+// Installation (returns Runnable)
+pocket.InstallGo("github.com/org/tool", "v1.0.0")  // go install
 
-// Download & Extract
-pocket.Download(ctx, url,
+// Installation helpers (inside Do() closures)
+pocket.CreateSymlink("path/to/binary")              // symlink to .pocket/bin/
+pocket.ConfigPath(ctx, "tool", config)              // find/create config file
+
+// Download & Extract (returns Runnable)
+pocket.Download(url,
     pocket.WithDestDir(dir),                              // extraction destination
     pocket.WithFormat("tar.gz"),                          // format: tar.gz, tar, zip, ""
     pocket.WithExtract(pocket.WithExtractFile(name)),     // extract specific file
@@ -437,7 +517,7 @@ pocket.Download(ctx, url,
     pocket.WithSkipIfExists(path),                        // skip if file exists
     pocket.WithHTTPHeader(key, value),                    // add HTTP header
 )
-pocket.FromLocal(ctx, path, opts...)  // process local file with same options
+pocket.FromLocal(path, opts...)  // process local file with same options
 
 // Platform
 pocket.HostOS()                     // runtime.GOOS ("darwin", "linux", "windows")

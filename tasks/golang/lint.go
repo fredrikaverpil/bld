@@ -16,25 +16,27 @@ type LintOptions struct {
 // Lint runs golangci-lint with auto-fix enabled by default.
 var Lint = pocket.Func("go-lint", "run golangci-lint", pocket.Serial(
 	golangcilint.Install,
-	lint,
+	lintCmd(),
 )).With(LintOptions{})
 
-func lint(ctx context.Context) error {
-	opts := pocket.Options[LintOptions](ctx)
+func lintCmd() pocket.Runnable {
+	return pocket.RunWith(golangcilint.Name, func(ctx context.Context) []string {
+		opts := pocket.Options[LintOptions](ctx)
 
-	args := []string{"run"}
-	if pocket.Verbose(ctx) {
-		args = append(args, "-v")
-	}
-	if opts.Config != "" {
-		args = append(args, "-c", opts.Config)
-	} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil && configPath != "" {
-		args = append(args, "-c", configPath)
-	}
-	if !opts.SkipFix {
-		args = append(args, "--fix")
-	}
-	args = append(args, "./...")
+		args := []string{"run"}
+		if pocket.Verbose(ctx) {
+			args = append(args, "-v")
+		}
+		if opts.Config != "" {
+			args = append(args, "-c", opts.Config)
+		} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil && configPath != "" {
+			args = append(args, "-c", configPath)
+		}
+		if !opts.SkipFix {
+			args = append(args, "--fix")
+		}
+		args = append(args, "./...")
 
-	return pocket.Exec(ctx, golangcilint.Name, args...)
+		return args
+	})
 }

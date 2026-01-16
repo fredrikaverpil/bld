@@ -46,28 +46,39 @@ type Runnable interface {
 }
 ```
 
-Five types implement Runnable:
+Eight types implement Runnable:
 
 ```
-                           Runnable
-                              │
-       ┌──────────┬───────────┼───────────┬──────────┐
-       │          │           │           │          │
-   FuncDef     serial     parallel   PathFilter  funcRunnable
-       │                                              │
-       └─ named, CLI-visible                          └─ internal wrapper
+                              Runnable
+                                  │
+       ┌──────────┬───────────────┼───────────────┬──────────┐
+       │          │               │               │          │
+   FuncDef     serial         parallel       PathFilter   ...
+       │          │               │               │
+       └─ named   └─ sequential   └─ concurrent   └─ directory-filtered
+
+Additional internal types:
+   commandRunnable       - static command (Run)
+   commandWithArgsRunnable - dynamic args (RunWith)
+   doRunnable            - arbitrary Go code (Do)
+   funcRunnable          - plain function wrapper
 ```
 
-| Type           | Purpose                                       |
-| -------------- | --------------------------------------------- |
-| `FuncDef`      | Named function with implementation            |
-| `serial`       | Sequential execution of children              |
-| `parallel`     | Concurrent execution of children              |
-| `PathFilter`   | Wraps a Runnable with directory-based filters |
-| `funcRunnable` | Internal wrapper for plain functions          |
+| Type                      | Purpose                                       |
+| ------------------------- | --------------------------------------------- |
+| `FuncDef`                 | Named function with implementation            |
+| `serial`                  | Sequential execution of children              |
+| `parallel`                | Concurrent execution of children              |
+| `PathFilter`              | Wraps a Runnable with directory-based filters |
+| `commandRunnable`         | Execute external command with static args     |
+| `commandWithArgsRunnable` | Execute command with dynamic args             |
+| `doRunnable`              | Execute arbitrary Go code                     |
+| `funcRunnable`            | Internal wrapper for plain functions          |
 
-`funcRunnable` wraps plain `func(context.Context) error` functions passed to
-Serial/Parallel, enabling them to participate in the tree without being named.
+The three command types (`Run`, `RunWith`, `Do`) are the primary building blocks
+for task implementations. They enable purely compositional task definitions where
+tree construction has no side effects - all execution happens when the engine
+walks the tree.
 
 ### FuncDef
 
@@ -107,6 +118,47 @@ Serial(Install, lint)          Parallel(Lint, Test)
 
 Parallel execution buffers output per-goroutine and flushes sequentially after
 all complete, preventing interleaved output.
+
+### Command Runnables
+
+Three types provide the primary building blocks for task implementations:
+
+**`Run(name, args...)`** - Static command with fixed arguments:
+
+```go
+pocket.Run("go", "build", "./...")
+```
+
+Creates a `commandRunnable` that executes immediately during tree walk.
+
+**`RunWith(name, argsFn)`** - Command with dynamically computed arguments:
+
+```go
+pocket.RunWith("golangci-lint", func(ctx context.Context) []string {
+    args := []string{"run"}
+    if pocket.Verbose(ctx) {
+        args = append(args, "-v")
+    }
+    return args
+})
+```
+
+Creates a `commandWithArgsRunnable`. The `argsFn` is called at execution time
+with full context access (options, path, verbose flag).
+
+**`Do(fn)`** - Escape hatch for arbitrary Go code:
+
+```go
+pocket.Do(func(ctx context.Context) error {
+    // file I/O, complex logic, multiple sequential commands
+    return nil
+})
+```
+
+Creates a `doRunnable` for operations that don't fit the command pattern.
+
+All three types are no-ops in collect mode (plan generation), ensuring tree
+construction is pure and side-effect free.
 
 ### Error Handling
 
@@ -352,11 +404,23 @@ Each tool package exports:
 ```go
 package mytool
 
-const Name = "mytool"           // binary name for pocket.Exec
+const Name = "mytool"           // binary name for pocket.Run
 const Version = "1.0.0"         // pinned version
 
-var Install = pocket.Func(      // hidden installer
-    "install:mytool", "install mytool", install,
+// Simple: Go tools use InstallGo directly
+var Install = pocket.Func("install:mytool", "install mytool",
+    pocket.InstallGo("github.com/org/mytool", Version),
+).Hidden()
+
+// Complex: Download-based tools use Download
+var Install = pocket.Func("install:mytool", "install mytool",
+    pocket.Download(downloadURL(),
+        pocket.WithDestDir(destDir()),
+        pocket.WithFormat(pocket.DefaultArchiveFormat()),
+        pocket.WithExtract(pocket.WithExtractFile(Name)),
+        pocket.WithSymlink(),
+        pocket.WithSkipIfExists(binaryPath()),
+    ),
 ).Hidden()
 ```
 
@@ -379,11 +443,17 @@ Tasks depend on tools via Serial composition:
 ```go
 var Lint = pocket.Func("lint", "run linter", pocket.Serial(
     mytool.Install,  // ensure installed first
-    lint,            // then run the task
+    lintCmd(),       // then run the task
 ))
 
-func lint(ctx context.Context) error {
-    return pocket.Exec(ctx, mytool.Name, "check", ".")
+func lintCmd() pocket.Runnable {
+    return pocket.RunWith(mytool.Name, func(ctx context.Context) []string {
+        args := []string{"check"}
+        if pocket.Verbose(ctx) {
+            args = append(args, "-v")
+        }
+        return args
+    })
 }
 ```
 
@@ -392,6 +462,7 @@ This pattern ensures:
 1. Install runs before the task (Serial ordering)
 2. Install runs only once per execution (deduplication)
 3. The task can use the tool by name (PATH prepending)
+4. Tree construction is pure - no side effects until execution
 
 ## Command Execution
 

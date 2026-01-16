@@ -14,27 +14,29 @@ type TestOptions struct {
 }
 
 // Test runs tests with race detection and coverage by default.
-var Test = pocket.Func("go-test", "run Go tests", test).
+var Test = pocket.Func("go-test", "run Go tests", testCmd()).
 	With(TestOptions{})
 
-func test(ctx context.Context) error {
-	opts := pocket.Options[TestOptions](ctx)
+func testCmd() pocket.Runnable {
+	return pocket.RunWith("go", func(ctx context.Context) []string {
+		opts := pocket.Options[TestOptions](ctx)
 
-	args := []string{"test"}
-	if pocket.Verbose(ctx) {
-		args = append(args, "-v")
-	}
-	if !opts.SkipRace {
-		args = append(args, "-race")
-	}
-	if !opts.SkipCoverage {
-		coverPath := pocket.FromGitRoot("coverage.out")
-		args = append(args, "-coverprofile="+coverPath)
-	}
-	if opts.Short {
-		args = append(args, "-short")
-	}
-	args = append(args, "./...")
+		args := []string{"test"}
+		if pocket.Verbose(ctx) {
+			args = append(args, "-v")
+		}
+		if !opts.SkipRace {
+			args = append(args, "-race")
+		}
+		if !opts.SkipCoverage {
+			coverPath := pocket.FromGitRoot("coverage.out")
+			args = append(args, "-coverprofile="+coverPath)
+		}
+		if opts.Short {
+			args = append(args, "-short")
+		}
+		args = append(args, "./...")
 
-	return pocket.Exec(ctx, "go", args...)
+		return args
+	})
 }

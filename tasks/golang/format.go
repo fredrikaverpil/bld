@@ -15,19 +15,21 @@ type FormatOptions struct {
 // Format formats Go code using golangci-lint fmt.
 var Format = pocket.Func("go-format", "format Go code", pocket.Serial(
 	golangcilint.Install,
-	format,
+	formatCmd(),
 )).With(FormatOptions{})
 
-func format(ctx context.Context) error {
-	opts := pocket.Options[FormatOptions](ctx)
+func formatCmd() pocket.Runnable {
+	return pocket.RunWith(golangcilint.Name, func(ctx context.Context) []string {
+		opts := pocket.Options[FormatOptions](ctx)
 
-	args := []string{"fmt"}
-	if opts.Config != "" {
-		args = append(args, "-c", opts.Config)
-	} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil && configPath != "" {
-		args = append(args, "-c", configPath)
-	}
-	args = append(args, "./...")
+		args := []string{"fmt"}
+		if opts.Config != "" {
+			args = append(args, "-c", opts.Config)
+		} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil && configPath != "" {
+			args = append(args, "-c", configPath)
+		}
+		args = append(args, "./...")
 
-	return pocket.Exec(ctx, golangcilint.Name, args...)
+		return args
+	})
 }

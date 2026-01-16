@@ -10,14 +10,16 @@ import (
 // Vulncheck runs govulncheck for vulnerability scanning.
 var Vulncheck = pocket.Func("go-vulncheck", "run govulncheck", pocket.Serial(
 	govulncheck.Install,
-	vulncheck,
+	vulncheckCmd(),
 ))
 
-func vulncheck(ctx context.Context) error {
-	args := []string{}
-	if pocket.Verbose(ctx) {
-		args = append(args, "-show", "verbose")
-	}
-	args = append(args, "./...")
-	return pocket.Exec(ctx, govulncheck.Name, args...)
+func vulncheckCmd() pocket.Runnable {
+	return pocket.RunWith(govulncheck.Name, func(ctx context.Context) []string {
+		args := []string{}
+		if pocket.Verbose(ctx) {
+			args = append(args, "-show", "verbose")
+		}
+		args = append(args, "./...")
+		return args
+	})
 }

@@ -56,46 +56,48 @@ func Version() string {
 //  3. git add package.json bun.lock
 var Install = pocket.Func("install:prettier", "install prettier", pocket.Serial(
 	bun.Install,
-	install,
+	installPrettier(),
 )).Hidden()
 
-func install(ctx context.Context) error {
-	installDir := pocket.FromToolsDir(Name, Version())
-	binary := bun.BinaryPath(installDir, Name)
+func installPrettier() pocket.Runnable {
+	return pocket.Do(func(ctx context.Context) error {
+		installDir := pocket.FromToolsDir(Name, Version())
+		binary := bun.BinaryPath(installDir, Name)
 
-	// Skip if already installed.
-	if _, err := os.Stat(binary); err == nil {
-		return nil
-	}
+		// Skip if already installed.
+		if _, err := os.Stat(binary); err == nil {
+			return nil
+		}
 
-	// Create install directory and write lockfile.
-	if err := os.MkdirAll(installDir, 0o755); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(installDir, "package.json"), packageJSON, 0o644); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(installDir, "bun.lock"), lockfile, 0o644); err != nil {
-		return err
-	}
-
-	// Install prettier using bun with frozen lockfile.
-	if err := bun.InstallFromLockfile(ctx, installDir); err != nil {
-		return err
-	}
-
-	// Create symlink on non-Windows platforms.
-	// On Windows, we skip symlink creation and use bun.Run() in Exec() instead,
-	// because Windows node_modules/.bin shims are PE executables that bun cannot
-	// execute directly (it tries to parse them as JavaScript).
-	// TODO: revisit once https://github.com/oven-sh/bun/issues/22422 or similar is resolved.
-	if runtime.GOOS != pocket.Windows {
-		if _, err := pocket.CreateSymlink(binary); err != nil {
+		// Create install directory and write lockfile.
+		if err := os.MkdirAll(installDir, 0o755); err != nil {
 			return err
 		}
-	}
+		if err := os.WriteFile(filepath.Join(installDir, "package.json"), packageJSON, 0o644); err != nil {
+			return err
+		}
+		if err := os.WriteFile(filepath.Join(installDir, "bun.lock"), lockfile, 0o644); err != nil {
+			return err
+		}
 
-	return nil
+		// Install prettier using bun with frozen lockfile.
+		if err := bun.InstallFromLockfile(ctx, installDir); err != nil {
+			return err
+		}
+
+		// Create symlink on non-Windows platforms.
+		// On Windows, we skip symlink creation and use bun.Run() in Exec() instead,
+		// because Windows node_modules/.bin shims are PE executables that bun cannot
+		// execute directly (it tries to parse them as JavaScript).
+		// TODO: revisit once https://github.com/oven-sh/bun/issues/22422 or similar is resolved.
+		if runtime.GOOS != pocket.Windows {
+			if _, err := pocket.CreateSymlink(binary); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
 }
 
 // Config for prettier configuration file lookup.

@@ -2,7 +2,6 @@
 package stylua
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"path/filepath"
@@ -27,9 +26,9 @@ var Config = pocket.ToolConfig{
 }
 
 // Install ensures stylua is available.
-var Install = pocket.Func("install:stylua", "install stylua", install).Hidden()
+var Install = pocket.Func("install:stylua", "install stylua", installStylua()).Hidden()
 
-func install(ctx context.Context) error {
+func installStylua() pocket.Runnable {
 	binDir := pocket.FromToolsDir("stylua", Version, "bin")
 	binaryName := pocket.BinaryName("stylua")
 	binaryPath := filepath.Join(binDir, binaryName)
@@ -48,7 +47,7 @@ func install(ctx context.Context) error {
 		Version, hostOS, hostArch,
 	)
 
-	return pocket.Download(ctx, url,
+	return pocket.Download(url,
 		pocket.WithDestDir(binDir),
 		pocket.WithFormat("zip"),
 		pocket.WithExtract(pocket.WithExtractFile(binaryName)),

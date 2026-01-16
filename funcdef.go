@@ -7,27 +7,41 @@ import (
 // FuncDef represents a named function that can be executed.
 // Create with pocket.Func() - this is the only way to create runnable functions.
 //
-// The body can be either:
-//   - A plain function: func(context.Context) error
-//   - A Runnable composition: pocket.Serial(...) or pocket.Parallel(...)
+// The body can be:
+//   - pocket.Run(name, args...) - static command
+//   - pocket.RunWith(name, argsFn) - command with dynamic args
+//   - pocket.Do(fn) - arbitrary Go code
+//   - pocket.Serial(...) or pocket.Parallel(...) - compositions
 //
 // Example:
 //
-//	// Simple function
-//	var Format = pocket.Func("go-format", "format Go code", func(ctx context.Context) error {
-//	    return pocket.Exec(ctx, "go", "fmt", "./...")
-//	})
+//	// Simple: static command
+//	var Format = pocket.Func("go-format", "format Go code",
+//	    pocket.Run("go", "fmt", "./..."),
+//	)
 //
-//	// Function with dependencies
+//	// Composed: install dependency then run
 //	var Lint = pocket.Func("go-lint", "run linter", pocket.Serial(
 //	    InstallLinter,
-//	    func(ctx context.Context) error {
-//	        return pocket.Exec(ctx, "golangci-lint", "run", "./...")
-//	    },
+//	    pocket.Run("golangci-lint", "run", "./..."),
 //	))
 //
-//	// Hidden functions (e.g., tool installers)
-//	var InstallLinter = pocket.Func("install:linter", "install linter", install).Hidden()
+//	// Dynamic: args computed at runtime
+//	var Test = pocket.Func("go-test", "run tests", testCmd())
+//	func testCmd() pocket.Runnable {
+//	    return pocket.RunWith("go", func(ctx context.Context) []string {
+//	        args := []string{"test"}
+//	        if pocket.Verbose(ctx) {
+//	            args = append(args, "-v")
+//	        }
+//	        return append(args, "./...")
+//	    })
+//	}
+//
+//	// Hidden: tool installers
+//	var InstallLinter = pocket.Func("install:linter", "install linter",
+//	    pocket.InstallGo("github.com/org/linter", "v1.0.0"),
+//	).Hidden()
 type FuncDef struct {
 	name   string
 	usage  string
@@ -42,8 +56,8 @@ type FuncDef struct {
 // The name is used for CLI commands (e.g., "go-format" becomes ./pok go-format).
 // The usage is displayed in help output.
 // The body can be:
-//   - func(context.Context) error - a plain function
-//   - Runnable - a Serial/Parallel composition
+//   - Runnable - from Run, RunWith, Do, Serial, Parallel
+//   - func(context.Context) error - legacy, wrapped automatically
 func Func(name, usage string, body any) *FuncDef {
 	if name == "" {
 		panic("pocket.Func: name is required")
@@ -255,4 +269,119 @@ func (f *funcRunnable) run(ctx context.Context) error {
 
 func (f *funcRunnable) funcs() []*FuncDef {
 	return nil
+}
+
+// commandRunnable executes an external command with static arguments.
+type commandRunnable struct {
+	name string
+	args []string
+}
+
+func (c *commandRunnable) run(ctx context.Context) error {
+	ec := getExecContext(ctx)
+	if ec.mode == modeCollect {
+		return nil
+	}
+	cmd := newCommand(ctx, c.name, c.args...)
+	cmd.Stdout = ec.out.Stdout
+	cmd.Stderr = ec.out.Stderr
+	if ec.path != "" {
+		cmd.Dir = FromGitRoot(ec.path)
+	} else {
+		cmd.Dir = GitRoot()
+	}
+	return cmd.Run()
+}
+
+func (c *commandRunnable) funcs() []*FuncDef {
+	return nil
+}
+
+// Run creates a Runnable that executes an external command.
+// The command runs in the current path directory with .pocket/bin in PATH.
+//
+// Example:
+//
+//	pocket.Run("go", "fmt", "./...")
+//	pocket.Run("golangci-lint", "run", "--fix", "./...")
+func Run(name string, args ...string) Runnable {
+	return &commandRunnable{name: name, args: args}
+}
+
+// commandWithArgsRunnable executes a command with dynamically evaluated arguments.
+type commandWithArgsRunnable struct {
+	name   string
+	argsFn func(context.Context) []string
+}
+
+func (c *commandWithArgsRunnable) run(ctx context.Context) error {
+	ec := getExecContext(ctx)
+	if ec.mode == modeCollect {
+		return nil
+	}
+	args := c.argsFn(ctx)
+	cmd := newCommand(ctx, c.name, args...)
+	cmd.Stdout = ec.out.Stdout
+	cmd.Stderr = ec.out.Stderr
+	if ec.path != "" {
+		cmd.Dir = FromGitRoot(ec.path)
+	} else {
+		cmd.Dir = GitRoot()
+	}
+	return cmd.Run()
+}
+
+func (c *commandWithArgsRunnable) funcs() []*FuncDef {
+	return nil
+}
+
+// RunWith creates a Runnable that executes an external command with dynamic arguments.
+// The args function is called at execution time with full context,
+// allowing access to Options[T], Path, Verbose, etc.
+//
+// Example:
+//
+//	pocket.RunWith("golangci-lint", func(ctx context.Context) []string {
+//	    opts := pocket.Options[LintOptions](ctx)
+//	    args := []string{"run"}
+//	    if pocket.Verbose(ctx) {
+//	        args = append(args, "-v")
+//	    }
+//	    if opts.Config != "" {
+//	        args = append(args, "-c", opts.Config)
+//	    }
+//	    return append(args, "./...")
+//	})
+func RunWith(name string, argsFn func(context.Context) []string) Runnable {
+	return &commandWithArgsRunnable{name: name, argsFn: argsFn}
+}
+
+// doRunnable wraps arbitrary Go code as a Runnable.
+type doRunnable struct {
+	fn func(context.Context) error
+}
+
+func (d *doRunnable) run(ctx context.Context) error {
+	ec := getExecContext(ctx)
+	if ec.mode == modeCollect {
+		return nil
+	}
+	return d.fn(ctx)
+}
+
+func (d *doRunnable) funcs() []*FuncDef {
+	return nil
+}
+
+// Do creates a Runnable from a function.
+// Use this for arbitrary Go code that doesn't fit the Run/RunWith model,
+// such as file I/O, API calls, or conditional logic.
+//
+// Example:
+//
+//	pocket.Do(func(ctx context.Context) error {
+//	    return os.WriteFile("output.txt", data, 0644)
+//	})
+func Do(fn func(context.Context) error) Runnable {
+	return &doRunnable{fn: fn}
 }
