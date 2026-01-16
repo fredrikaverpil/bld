@@ -14,7 +14,7 @@ import (
 const Name = "uv"
 
 // renovate: datasource=github-releases depName=astral-sh/uv
-const Version = "0.7.13"
+const Version = "0.9.26"
 
 // Install ensures uv is available.
 var Install = pocket.Func("install:uv", "install uv", install).Hidden()
