@@ -59,9 +59,7 @@ var Workflows = pocket.Task("github-workflows", "bootstrap GitHub workflow files
 	With(WorkflowsOptions{})
 
 func workflowsCmd() pocket.Runnable {
-	return pocket.Do(func(ctx context.Context) error {
-		return runWorkflows(ctx)
-	})
+	return pocket.Do(runWorkflows)
 }
 
 func runWorkflows(ctx context.Context) error {

@@ -25,8 +25,10 @@ func formatCmd() pocket.Runnable {
 		args := []string{"fmt"}
 		if opts.Config != "" {
 			args = append(args, "-c", opts.Config)
-		} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil && configPath != "" {
-			args = append(args, "-c", configPath)
+		} else if configPath, err := pocket.ConfigPath(ctx, "golangci-lint", golangcilint.Config); err == nil {
+			if configPath != "" {
+				args = append(args, "-c", configPath)
+			}
 		}
 		args = append(args, "./...")
 
