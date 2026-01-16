@@ -3,6 +3,7 @@ package pocket
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -129,23 +130,25 @@ func (p *parallel) run(ctx context.Context) error {
 		buffers[i] = newBufferedOutput(ec.out)
 	}
 
+	var flushMu sync.Mutex
+
 	g, gCtx := errgroup.WithContext(ctx)
 	for i, r := range toRun {
 		g.Go(func() error {
 			newEC := *ec
 			newEC.out = buffers[i].Output()
 			newCtx := withExecContext(gCtx, &newEC)
-			return r.run(newCtx)
+			err := r.run(newCtx)
+
+			flushMu.Lock()
+			buffers[i].Flush()
+			flushMu.Unlock()
+
+			return err
 		})
 	}
 
-	err := g.Wait()
-
-	for _, buf := range buffers {
-		buf.Flush()
-	}
-
-	return err
+	return g.Wait()
 }
 
 func (p *parallel) funcs() []*TaskDef {
