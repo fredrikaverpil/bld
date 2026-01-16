@@ -7,6 +7,35 @@ import (
 	"strings"
 )
 
+// DetectByFile finds directories containing any of the specified files (e.g., "go.mod").
+// Returns paths relative to git root, sorted alphabetically.
+// Excludes .pocket directory and hidden directories.
+// Each directory is returned only once, even if multiple marker files are found.
+func DetectByFile(filenames ...string) []string {
+	targets := make(map[string]bool, len(filenames))
+	for _, f := range filenames {
+		targets[f] = true
+	}
+	return detectDirs(func(name string) bool {
+		return targets[name]
+	})
+}
+
+// DetectByExtension finds directories containing files with any of the specified extensions.
+// Returns paths relative to git root, sorted alphabetically.
+// Excludes .pocket directory and hidden directories.
+// Each directory is returned only once, even if multiple matching files are found.
+func DetectByExtension(extensions ...string) []string {
+	return detectDirs(func(name string) bool {
+		for _, ext := range extensions {
+			if strings.HasSuffix(name, ext) {
+				return true
+			}
+		}
+		return false
+	})
+}
+
 // detectDirs walks the git repository and returns directories containing files
 // that match the predicate. Excludes hidden directories and common vendor directories.
 // Returns paths relative to git root, sorted alphabetically.
@@ -46,33 +75,4 @@ func detectDirs(predicate func(name string) bool) []string {
 	}
 	slices.Sort(paths)
 	return paths
-}
-
-// DetectByFile finds directories containing any of the specified files (e.g., "go.mod").
-// Returns paths relative to git root, sorted alphabetically.
-// Excludes .pocket directory and hidden directories.
-// Each directory is returned only once, even if multiple marker files are found.
-func DetectByFile(filenames ...string) []string {
-	targets := make(map[string]bool, len(filenames))
-	for _, f := range filenames {
-		targets[f] = true
-	}
-	return detectDirs(func(name string) bool {
-		return targets[name]
-	})
-}
-
-// DetectByExtension finds directories containing files with any of the specified extensions.
-// Returns paths relative to git root, sorted alphabetically.
-// Excludes .pocket directory and hidden directories.
-// Each directory is returned only once, even if multiple matching files are found.
-func DetectByExtension(extensions ...string) []string {
-	return detectDirs(func(name string) bool {
-		for _, ext := range extensions {
-			if strings.HasSuffix(name, ext) {
-				return true
-			}
-		}
-		return false
-	})
 }
