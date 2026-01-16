@@ -57,7 +57,7 @@ func Version() string {
 var Install = pocket.Task("install:prettier", "install prettier", pocket.Serial(
 	bun.Install,
 	installPrettier(),
-)).Hidden()
+), pocket.AsHidden())
 
 func installPrettier() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

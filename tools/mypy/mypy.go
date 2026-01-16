@@ -23,7 +23,7 @@ const pythonVersion = "3.12"
 var Install = pocket.Task("install:mypy", "install mypy", pocket.Serial(
 	uv.Install,
 	installMypy(),
-)).Hidden()
+), pocket.AsHidden())
 
 func installMypy() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

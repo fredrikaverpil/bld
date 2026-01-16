@@ -46,12 +46,12 @@ func Tasks(opts ...Option) pocket.Runnable {
 	// Apply options to tasks
 	lintTask := Lint
 	if cfg.lint != (LintOptions{}) {
-		lintTask = Lint.With(cfg.lint)
+		lintTask = pocket.WithOpts(Lint, cfg.lint)
 	}
 
 	testTask := Test
 	if cfg.test != (TestOptions{}) {
-		testTask = Test.With(cfg.test)
+		testTask = pocket.WithOpts(Test, cfg.test)
 	}
 
 	return pocket.Serial(

@@ -17,7 +17,10 @@ const Name = "ts_query_ls"
 const Version = "3.15.1"
 
 // Install ensures ts_query_ls is available.
-var Install = pocket.Task("install:ts_query_ls", "install ts_query_ls", installTSQueryLs()).Hidden()
+var Install = pocket.Task("install:ts_query_ls", "install ts_query_ls",
+	installTSQueryLs(),
+	pocket.AsHidden(),
+)
 
 func installTSQueryLs() pocket.Runnable {
 	binDir := pocket.FromToolsDir("ts_query_ls", Version, "bin")

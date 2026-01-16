@@ -12,7 +12,8 @@ const Version = "v2.0.2"
 // Install ensures golangci-lint is available.
 var Install = pocket.Task("install:golangci-lint", "install golangci-lint",
 	pocket.InstallGo("github.com/golangci/golangci-lint/v2/cmd/golangci-lint", Version),
-).Hidden()
+	pocket.AsHidden(),
+)
 
 // Config for golangci-lint configuration file lookup.
 var Config = pocket.ToolConfig{

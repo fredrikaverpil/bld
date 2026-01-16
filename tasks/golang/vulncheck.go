@@ -8,10 +8,9 @@ import (
 )
 
 // Vulncheck runs govulncheck for vulnerability scanning.
-var Vulncheck = pocket.Task("go-vulncheck", "run govulncheck", pocket.Serial(
-	govulncheck.Install,
-	vulncheckCmd(),
-))
+var Vulncheck = pocket.Task("go-vulncheck", "run govulncheck",
+	pocket.Serial(govulncheck.Install, vulncheckCmd()),
+)
 
 func vulncheckCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

@@ -104,7 +104,8 @@ each task runs at most once per execution.
 ```go
 var Install = pocket.Task("install:tool", "install tool",
     pocket.InstallGo("github.com/org/tool", "v1.0.0"),
-).Hidden()
+    pocket.AsHidden(),
+)
 
 var Lint = pocket.Task("lint", "run linter", pocket.Serial(
     Install,  // runs first (deduplicated across the tree)
@@ -148,7 +149,7 @@ func lintCmd() pocket.Runnable {
 Tasks can be:
 
 - **Visible**: Shown in `./pok -h`, callable from CLI
-- **Hidden**: Not shown in help, used as dependencies (`.Hidden()`)
+- **Hidden**: Not shown in help, used as dependencies (`pocket.AsHidden()`)
 
 ### Executing Commands
 
@@ -235,7 +236,8 @@ const Version = "v2.0.2"
 // For Go tools: use InstallGo directly
 var Install = pocket.Task("install:golangci-lint", "install golangci-lint",
     pocket.InstallGo("github.com/golangci/golangci-lint/v2/cmd/golangci-lint", Version),
-).Hidden()
+    pocket.AsHidden(),
+)
 
 var Config = pocket.ToolConfig{
     UserFiles:   []string{".golangci.yml", ".golangci.yaml", ".golangci.toml"},
@@ -261,7 +263,8 @@ var Install = pocket.Task("install:stylua", "install stylua",
         pocket.WithSymlink(),
         pocket.WithSkipIfExists(binaryPath()),
     ),
-).Hidden()
+    pocket.AsHidden(),
+)
 ```
 
 #### 2. Task Package
@@ -275,7 +278,7 @@ package golang
 var Lint = pocket.Task("go-lint", "run golangci-lint", pocket.Serial(
     golangcilint.Install,  // ensure tool is installed first
     lintCmd(),             // then run linting
-)).With(LintOptions{})
+), pocket.Opts(LintOptions{}))
 
 func lintCmd() pocket.Runnable {
     return pocket.Do(func(ctx context.Context) error {
@@ -377,6 +380,22 @@ task.
 
 ## Path Filtering
 
+Use `RunIn()` to control where tasks are visible and run. **`RunIn()` is
+optional** - tasks without it only run at the git root:
+
+```go
+var Config = pocket.Config{
+    AutoRun: pocket.Parallel(
+        // These use RunIn - run in each detected Go/Markdown location
+        pocket.RunIn(golang.Tasks(), pocket.Detect(golang.Detect())),
+        pocket.RunIn(markdown.Tasks(), pocket.Detect(markdown.Detect())),
+
+        // No RunIn - only runs at git root
+        github.Workflows,
+    ),
+}
+```
+
 For e.g. monorepos, use `RunIn()` to control where tasks run:
 
 ```go
@@ -400,8 +419,8 @@ pocket.RunIn(golang.Tasks(),
 ### Skipping Tasks in Specific Paths
 
 While `Exclude()` excludes entire task compositions from directories, use
-`Skip()` to skip specific tasks within a composition. This controls which
-tasks run in each detected directory - it doesn't modify the task's arguments.
+`Skip()` to skip specific tasks within a composition. This controls which tasks
+run in each detected directory - it doesn't modify the task's arguments.
 
 For example, in a monorepo with multiple Go services (each with their own
 `go.mod`), you might want to skip slow tests in certain services:
@@ -415,7 +434,7 @@ var Config = pocket.Config{
 
     // Make skipped tests available under a different name
     ManualRun: []pocket.Runnable{
-        pocket.RunIn(golang.Test.WithName("integration-test"),
+        pocket.RunIn(pocket.Clone(golang.Test, pocket.Named("integration-test")),
             pocket.Include("services/api", "services/worker"),
         ),
     },
@@ -427,8 +446,9 @@ Here `services/api/` and `services/worker/` are separate Go modules detected by
 detected modules, but `go-test` is skipped in those two. The skipped tests are
 available as `integration-test` when run from those directories.
 
-Note: `WithName()` creates a copy of the task with a different CLI name. This
-avoids duplicate names when the same task appears in both AutoRun and ManualRun.
+Note: `Clone(..., Named(...))` creates a copy of the task with a different CLI
+name. This avoids duplicate names when the same task appears in both AutoRun and
+ManualRun.
 
 ## Options
 
@@ -440,8 +460,9 @@ type DeployOptions struct {
     DryRun bool   `arg:"dry-run" usage:"print without executing"`
 }
 
-var Deploy = pocket.Task("deploy", "deploy to environment", deploy).
-    With(DeployOptions{Env: "staging"})
+var Deploy = pocket.Task("deploy", "deploy to environment", deploy,
+    pocket.Opts(DeployOptions{Env: "staging"}),
+)
 
 func deploy(ctx context.Context) error {
     opts := pocket.Options[DeployOptions](ctx)
@@ -549,7 +570,10 @@ var Config = pocket.Config{
 
     // ManualRun: requires ./pok <name>
     ManualRun: []pocket.Runnable{
-        pocket.RunIn(golang.Test.WithName("slow-test"), pocket.Include("services/worker")),
+        pocket.RunIn(
+            pocket.Clone(golang.Test, pocket.Named("slow-test")),
+            pocket.Include("services/worker"),
+        ),
     },
 
     // Shim: configure wrapper scripts

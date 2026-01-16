@@ -113,12 +113,12 @@ func TestNested_Serial_Parallel(t *testing.T) {
 	}
 }
 
-// TestFuncDef_WithName verifies that WithName creates a copy with a new name.
-func TestFuncDef_WithName(t *testing.T) {
+// TestFuncDef_Clone_Named verifies that Clone with Named creates a copy with a new name.
+func TestFuncDef_Clone_Named(t *testing.T) {
 	t.Parallel()
 
 	original := Task("go-test", "run tests", func(_ context.Context) error { return nil })
-	renamed := original.WithName("integration-test")
+	renamed := Clone(original, Named("integration-test"))
 
 	// Verify names are different
 	if original.Name() != "go-test" {
@@ -139,12 +139,12 @@ func TestFuncDef_WithName(t *testing.T) {
 	}
 }
 
-// TestFuncDef_WithUsage verifies that WithUsage creates a copy with new help text.
-func TestFuncDef_WithUsage(t *testing.T) {
+// TestFuncDef_Clone_Usage verifies that Clone with Usage creates a copy with new help text.
+func TestFuncDef_Clone_Usage(t *testing.T) {
 	t.Parallel()
 
 	original := Task("go-test", "run tests", func(_ context.Context) error { return nil })
-	modified := original.WithUsage("run unit tests only")
+	modified := Clone(original, Usage("run unit tests only"))
 
 	// Verify usages are different
 	if original.Usage() != "run tests" {
@@ -160,12 +160,12 @@ func TestFuncDef_WithUsage(t *testing.T) {
 	}
 }
 
-// TestFuncDef_Chaining verifies that WithName and WithUsage can be chained.
-func TestFuncDef_Chaining(t *testing.T) {
+// TestFuncDef_Clone_Multiple verifies that Clone accepts multiple options.
+func TestFuncDef_Clone_Multiple(t *testing.T) {
 	t.Parallel()
 
 	original := Task("go-test", "run tests", func(_ context.Context) error { return nil })
-	chained := original.WithName("integration-test").WithUsage("run integration tests").Hidden()
+	chained := Clone(original, Named("integration-test"), Usage("run integration tests"), AsHidden())
 
 	if chained.Name() != "integration-test" {
 		t.Errorf("name wrong: got %q", chained.Name())
@@ -198,11 +198,11 @@ func TestSkipTaskWithManualRun_WithName(t *testing.T) {
 	formatTask := Task("go-format", "format", func(_ context.Context) error { return nil })
 	workflow := Serial(formatTask, testTask)
 
-	// Use WithName to give the ManualRun task a distinct name
+	// Use Clone with Named to give the ManualRun task a distinct name
 	cfg := Config{
 		AutoRun: RunIn(workflow, Include("services/api"), Skip(testTask, "services/api")),
 		ManualRun: []Runnable{
-			RunIn(testTask.WithName("integration-test"), Include("services/api")),
+			RunIn(Clone(testTask, Named("integration-test")), Include("services/api")),
 		},
 	}
 

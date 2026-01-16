@@ -55,22 +55,22 @@ func Tasks(opts ...Option) pocket.Runnable {
 	// Sync task with Python version
 	syncTask := Sync
 	if cfg.pythonVersion != "" {
-		syncTask = Sync.With(SyncOptions{PythonVersion: cfg.pythonVersion})
+		syncTask = pocket.WithOpts(Sync, SyncOptions{PythonVersion: cfg.pythonVersion})
 	}
 
 	formatTask := Format
 	if cfg.format != (FormatOptions{}) {
-		formatTask = Format.With(cfg.format)
+		formatTask = pocket.WithOpts(Format, cfg.format)
 	}
 
 	lintTask := Lint
 	if cfg.lint != (LintOptions{}) {
-		lintTask = Lint.With(cfg.lint)
+		lintTask = pocket.WithOpts(Lint, cfg.lint)
 	}
 
 	testTask := Test
 	if cfg.test != (TestOptions{}) {
-		testTask = Test.With(cfg.test)
+		testTask = pocket.WithOpts(Test, cfg.test)
 	}
 
 	// Run sync first, then format, lint, typecheck, test (serial since format/lint modify files)

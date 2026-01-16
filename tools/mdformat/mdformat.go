@@ -36,7 +36,7 @@ func Version() string {
 var Install = pocket.Task("install:mdformat", "install mdformat", pocket.Serial(
 	uv.Install,
 	installMdformat(),
-)).Hidden()
+), pocket.AsHidden())
 
 func installMdformat() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

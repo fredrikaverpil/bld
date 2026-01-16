@@ -31,10 +31,10 @@ var Config = pocket.ToolConfig{
 }
 
 // Install ensures ruff is available.
-var Install = pocket.Task("install:ruff", "install ruff", pocket.Serial(
-	uv.Install,
-	installRuff(),
-)).Hidden()
+var Install = pocket.Task("install:ruff", "install ruff",
+	pocket.Serial(uv.Install, installRuff()),
+	pocket.AsHidden(),
+)
 
 func installRuff() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

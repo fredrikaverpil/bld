@@ -85,8 +85,8 @@ func TestOptions_ShadowingPanics(t *testing.T) {
 	}
 
 	// Create nested FuncDefs that both use the same options type
-	innerFunc := Task("inner", "inner func", inner).With(SharedOptions{Value: "inner"})
-	outerFunc := Task("outer", "outer func", Serial(innerFunc, outer)).With(SharedOptions{Value: "outer"})
+	innerFunc := Task("inner", "inner func", inner, Opts(SharedOptions{Value: "inner"}))
+	outerFunc := Task("outer", "outer func", Serial(innerFunc, outer), Opts(SharedOptions{Value: "outer"}))
 
 	// Create execution context and run - should panic
 	out := StdOutput()
@@ -115,7 +115,7 @@ func TestSerial_WithDependency(t *testing.T) {
 	}
 
 	// Pattern: TaskDef with install dependency
-	installFunc := Task("install", "install tool", install).Hidden()
+	installFunc := Task("install", "install tool", install, AsHidden())
 	lintFunc := Task("lint", "run linter", Serial(installFunc, lint))
 
 	// Create execution context and run

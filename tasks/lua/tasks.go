@@ -36,7 +36,7 @@ func Tasks(opts ...Option) pocket.Runnable {
 
 	formatTask := Format
 	if cfg.format != (FormatOptions{}) {
-		formatTask = Format.With(cfg.format)
+		formatTask = pocket.WithOpts(Format, cfg.format)
 	}
 
 	return pocket.Serial(formatTask)

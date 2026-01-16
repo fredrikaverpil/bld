@@ -8,10 +8,9 @@ import (
 )
 
 // Typecheck type-checks Python files using mypy.
-var Typecheck = pocket.Task("py-typecheck", "type-check Python files", pocket.Serial(
-	mypy.Install,
-	typecheckCmd(),
-))
+var Typecheck = pocket.Task("py-typecheck", "type-check Python files",
+	pocket.Serial(mypy.Install, typecheckCmd()),
+)
 
 func typecheckCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

@@ -23,7 +23,7 @@ const pythonVersion = "3.12"
 var Install = pocket.Task("install:basedpyright", "install basedpyright", pocket.Serial(
 	uv.Install,
 	installBasedpyright(),
-)).Hidden()
+), pocket.AsHidden())
 
 func installBasedpyright() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {

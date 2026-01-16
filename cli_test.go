@@ -27,8 +27,8 @@ func TestPrintFuncHelp_NoArgs(t *testing.T) {
 }
 
 func TestPrintFuncHelp_WithArgs(t *testing.T) {
-	fn := Task("greet", "print a greeting", func(_ context.Context) error { return nil }).
-		With(CLITestOptions{Name: "world", Count: 5})
+	fn := Task("greet", "print a greeting", func(_ context.Context) error { return nil },
+		Opts(CLITestOptions{Name: "world", Count: 5}))
 
 	info, err := inspectArgs(fn.opts)
 	if err != nil {

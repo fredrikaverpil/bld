@@ -49,6 +49,9 @@ type TaskDef struct {
 	hidden bool
 }
 
+// TaskOpt configures a task created with Task().
+type TaskOpt func(*TaskDef)
+
 // Task creates a new named task.
 // This is the primary way to create tasks that appear in the CLI.
 //
@@ -57,7 +60,14 @@ type TaskDef struct {
 // The body can be:
 //   - Runnable - from Run, Do, Serial, Parallel
 //   - func(context.Context) error - legacy, wrapped automatically
-func Task(name, usage string, body any) *TaskDef {
+//
+// Use options to configure the task:
+//
+//	var Lint = pocket.Task("lint", "run linter", lintCmd(),
+//	    pocket.Opts(LintOptions{}),
+//	    pocket.AsHidden(),
+//	)
+func Task(name, usage string, body any, opts ...TaskOpt) *TaskDef {
 	if name == "" {
 		panic("pocket.Func: name is required")
 	}
@@ -68,73 +78,82 @@ func Task(name, usage string, body any) *TaskDef {
 		panic("pocket.Func: body is required")
 	}
 
-	return &TaskDef{
+	td := &TaskDef{
 		name:  name,
 		usage: usage,
 		body:  toRunnable(body),
 	}
+	for _, opt := range opts {
+		opt(td)
+	}
+	return td
 }
 
-// With returns a copy with options attached.
+// Opts attaches CLI options to a task.
 // Options are accessible via pocket.Options[T](ctx) in the function.
 //
 // Example:
 //
 //	type FormatOptions struct {
-//	    Config string
+//	    Config string `arg:"config" usage:"path to config file"`
 //	}
 //
-//	var Format = pocket.Task("format", "format code", formatImpl).
-//	    With(FormatOptions{Config: ".golangci.yml"})
-//
-//	func formatImpl(ctx context.Context) error {
-//	    opts := pocket.Options[FormatOptions](ctx)
-//	    // use opts.Config
-//	}
-func (f *TaskDef) With(opts any) *TaskDef {
-	cp := *f
-	cp.opts = opts
-	return &cp
+//	var Format = pocket.Task("format", "format code", formatImpl,
+//	    pocket.Opts(FormatOptions{Config: ".golangci.yml"}),
+//	)
+func Opts(opts any) TaskOpt {
+	return func(td *TaskDef) {
+		td.opts = opts
+	}
 }
 
-// Hidden returns a copy marked as hidden from CLI help.
-// Hidden functions can still be executed but don't appear in ./pok -h.
-// Use this for internal functions like tool installers.
-func (f *TaskDef) Hidden() *TaskDef {
-	cp := *f
-	cp.hidden = true
-	return &cp
-}
-
-// WithName returns a copy with a different CLI name.
-// Use this when the same task needs different names in different contexts,
-// such as exposing a skipped AutoRun task under a distinct name in ManualRun.
+// AsHidden marks a task as hidden from CLI help.
+// Hidden tasks can still be executed but don't appear in ./pok -h.
+// Use this for internal tasks like tool installers.
 //
 // Example:
 //
-//	golang.Test.WithName("integration-test")  // same task, different CLI name
-func (f *TaskDef) WithName(name string) *TaskDef {
+//	var Install = pocket.Task("install:tool", "install tool",
+//	    pocket.InstallGo("github.com/org/tool", "v1.0.0"),
+//	    pocket.AsHidden(),
+//	)
+func AsHidden() TaskOpt {
+	return func(td *TaskDef) {
+		td.hidden = true
+	}
+}
+
+// Named sets a different CLI name for the task.
+// Use this when the same task needs different names in different contexts.
+//
+// Example:
+//
+//	pocket.Task("integration-test", "run integration tests", testImpl,
+//	    pocket.Named("integration-test"),
+//	)
+func Named(name string) TaskOpt {
 	if name == "" {
-		panic("pocket.TaskDef.WithName: name is required")
+		panic("pocket.Named: name is required")
 	}
-	cp := *f
-	cp.name = name
-	return &cp
+	return func(td *TaskDef) {
+		td.name = name
+	}
 }
 
-// WithUsage returns a copy with different help text.
-// Use this with WithName when the renamed task needs a distinct description.
+// Usage sets different help text for the task.
 //
 // Example:
 //
-//	golang.Test.WithName("integration-test").WithUsage("run integration tests")
-func (f *TaskDef) WithUsage(usage string) *TaskDef {
+//	pocket.Task("test", "run tests", testImpl,
+//	    pocket.Usage("run integration tests"),
+//	)
+func Usage(usage string) TaskOpt {
 	if usage == "" {
-		panic("pocket.TaskDef.WithUsage: usage is required")
+		panic("pocket.Usage: usage is required")
 	}
-	cp := *f
-	cp.usage = usage
-	return &cp
+	return func(td *TaskDef) {
+		td.usage = usage
+	}
 }
 
 // Name returns the function's CLI name.
@@ -152,9 +171,58 @@ func (f *TaskDef) IsHidden() bool {
 	return f.hidden
 }
 
-// Opts returns the function's options, or nil if none.
-func (f *TaskDef) Opts() any {
+// GetOpts returns the function's options, or nil if none.
+func (f *TaskDef) GetOpts() any {
 	return f.opts
+}
+
+// WithOpts creates a copy of a task with different options.
+// This is useful for creating task variants at runtime, such as
+// applying CLI-parsed options or package-level configuration.
+//
+// Example:
+//
+//	// In a task package's Tasks() function:
+//	lintTask := Lint
+//	if cfg.lint != (LintOptions{}) {
+//	    lintTask = pocket.WithOpts(Lint, cfg.lint)
+//	}
+//
+//	// In CLI option parsing:
+//	taskWithOpts := pocket.WithOpts(task, parsedOpts)
+func WithOpts(task *TaskDef, opts any) *TaskDef {
+	return &TaskDef{
+		name:   task.name,
+		usage:  task.usage,
+		body:   task.body,
+		opts:   opts,
+		hidden: task.hidden,
+	}
+}
+
+// Clone creates a copy of a task with modifications applied.
+// This is useful for creating task variants at runtime, such as
+// renaming a task to avoid duplicate names in ManualRun.
+//
+// Example:
+//
+//	// Give a task a different name for ManualRun
+//	pocket.Clone(golang.Test, pocket.Named("integration-test"))
+//
+//	// Clone with multiple modifications
+//	pocket.Clone(myTask, pocket.Named("new-name"), pocket.AsHidden())
+func Clone(task *TaskDef, opts ...TaskOpt) *TaskDef {
+	td := &TaskDef{
+		name:   task.name,
+		usage:  task.usage,
+		body:   task.body,
+		opts:   task.opts,
+		hidden: task.hidden,
+	}
+	for _, opt := range opts {
+		opt(td)
+	}
+	return td
 }
 
 // Run executes this function with the given context.

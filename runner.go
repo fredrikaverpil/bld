@@ -74,7 +74,7 @@ func RunConfig(cfg Config) {
 			}
 
 			return nil
-		}).Hidden()
+		}, AsHidden())
 	}
 
 	// Add manual run functions and their path mappings.
@@ -174,7 +174,7 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			}
 
 			return nil
-		}).With(planOptions{}),
+		}, Opts(planOptions{})),
 
 		// clean: remove .pocket/tools and .pocket/bin directories
 		Task("clean", "remove .pocket/tools and .pocket/bin directories", func(ctx context.Context) error {

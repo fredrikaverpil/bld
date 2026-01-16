@@ -64,7 +64,7 @@ func TestEngine_Plan_NestedDeps(t *testing.T) {
 	// Create a hidden install function
 	install := Task("install:tool", "install", func(_ context.Context) error {
 		return nil
-	}).Hidden()
+	}, AsHidden())
 
 	// Create a function that depends on install using static composition
 	// (inline Serial() calls in function bodies are not visible in plan)
@@ -123,7 +123,7 @@ func TestEngine_Plan_Deduplication(t *testing.T) {
 	// Create a shared dependency
 	install := Task("install:shared", "install", func(_ context.Context) error {
 		return nil
-	}).Hidden()
+	}, AsHidden())
 
 	// Create two functions that both depend on install using static composition
 	fn1 := Task("fn1", "first", Serial(

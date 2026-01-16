@@ -14,8 +14,8 @@ execute tasks or visualize the plan.
 │                        pocket.Config                        │
 │  ┌─────────────────────────────────────────────────────┐   │
 │  │ AutoRun: Serial(                                    │   │
-│  │   Paths(golang.Tasks()).DetectBy(golang.Detect())   │   │
-│  │   Paths(python.Tasks()).DetectBy(python.Detect())   │   │
+│  │   RunIn(golang.Tasks(), Detect(golang.Detect()))    │   │
+│  │   RunIn(python.Tasks(), Detect(python.Detect()))    │   │
 │  │ )                                                   │   │
 │  └─────────────────────────────────────────────────────┘   │
 │  ┌─────────────────┐                                       │
@@ -291,16 +291,17 @@ type PathFilter struct {
          └──────────────────────┘
 ```
 
-### Builder Pattern
+### Functional Options Pattern
 
-PathFilter uses immutable builders that return new copies:
+PathFilter uses functional options for configuration:
 
 ```go
-Paths(golang.Tasks()).
-    DetectBy(golang.Detect()).  // auto-detect directories
-    In("services/.*").          // include pattern
-    Except("vendor").           // exclude pattern
-    Skip(golang.Test, "docs")   // skip function in path
+RunIn(golang.Tasks(),
+    Detect(golang.Detect()),    // auto-detect directories
+    Include("services/.*"),     // include pattern
+    Exclude("vendor"),          // exclude pattern
+    Skip(golang.Test, "docs"),  // skip function in path
+)
 ```
 
 ## Deduplication
@@ -398,7 +399,8 @@ const Version = "1.0.0"         // pinned version
 // Simple: Go tools use InstallGo directly
 var Install = pocket.Task("install:mytool", "install mytool",
     pocket.InstallGo("github.com/org/mytool", Version),
-).Hidden()
+    pocket.AsHidden(),
+)
 
 // Complex: Download-based tools use Download
 var Install = pocket.Task("install:mytool", "install mytool",
@@ -409,7 +411,8 @@ var Install = pocket.Task("install:mytool", "install mytool",
         pocket.WithSymlink(),
         pocket.WithSkipIfExists(binaryPath()),
     ),
-).Hidden()
+    pocket.AsHidden(),
+)
 ```
 
 ### Installation Layout
@@ -651,13 +654,13 @@ These tasks are always available:
 The `Runnable` interface uses unexported methods (`run`, `funcs`) to prevent
 external implementations, ensuring only pocket's types can be Runnables.
 
-### Immutable Builders
+### Functional Options
 
-`PathFilter.In()`, `Except()`, etc. return new copies, enabling fluent chaining:
+`RunIn()` accepts variadic `PathOpt` functions for configuration:
 
 ```go
-// Each call returns a new PathFilter
-paths := Paths(fn).In("a").Except("b")
+// Options configure the PathFilter
+paths := RunIn(fn, Include("a"), Exclude("b"))
 ```
 
 ### Dual-Mode via Context

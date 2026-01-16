@@ -142,7 +142,7 @@ func cliRun(
 					return 1
 				}
 				if parsedOpts != nil {
-					funcToRun = f.With(parsedOpts)
+					funcToRun = WithOpts(f, parsedOpts)
 				}
 			}
 		} else {
