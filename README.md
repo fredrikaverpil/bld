@@ -391,6 +391,10 @@ func deploy(ctx context.Context) error {
 ### Helper Functions
 
 ```go
+// Composition
+pocket.Serial(fn1, fn2, fn3)     // run in sequence
+pocket.Parallel(fn1, fn2, fn3)   // run concurrently
+
 // Execution
 pocket.Exec(ctx, "cmd", "arg1", "arg2")       // run command in current path
 pocket.ExecIn(ctx, "dir", "cmd", "args"...)   // run command in specific dir
@@ -435,11 +439,20 @@ pocket.Download(ctx, url,
 pocket.FromLocal(ctx, path, opts...)  // process local file with same options
 
 // Platform
-pocket.HostOS()                   // runtime.GOOS ("darwin", "linux", "windows")
-pocket.HostArch()                 // runtime.GOARCH ("amd64", "arm64")
-pocket.DefaultArchiveFormat()     // "zip" on Windows, "tar.gz" otherwise
-pocket.ArchToX8664(arch)          // convert "amd64" → "x86_64"
-pocket.ArchToAMD64(arch)          // convert "x86_64" → "amd64"
+pocket.HostOS()                     // runtime.GOOS ("darwin", "linux", "windows")
+pocket.HostArch()                   // runtime.GOARCH ("amd64", "arm64")
+pocket.DefaultArchiveFormat()       // "zip" on Windows, "tar.gz" otherwise
+pocket.DefaultArchiveFormatFor(os)  // "zip" for Windows, "tar.gz" otherwise
+pocket.ArchToX8664(arch)            // convert "amd64" → "x86_64"
+pocket.ArchToAMD64(arch)            // convert "x86_64" → "amd64"
+pocket.ArchToX64(arch)              // convert "amd64" → "x64"
+pocket.OSToTitle(os)                // convert "darwin" → "Darwin"
+pocket.OSToUpper(os)                // convert "darwin" → "DARWIN"
+
+// Platform constants
+pocket.Darwin, pocket.Linux, pocket.Windows          // OS names
+pocket.AMD64, pocket.ARM64                           // Go-style arch
+pocket.X8664, pocket.AARCH64, pocket.X64             // alternative arch names
 
 // Module
 pocket.GoVersionFromDir("dir")    // read Go version from go.mod
