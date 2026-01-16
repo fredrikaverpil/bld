@@ -112,3 +112,132 @@ func TestNested_Serial_Parallel(t *testing.T) {
 		t.Errorf("funcs() length = %d, want 3", len(funcs))
 	}
 }
+
+// TestFuncDef_WithName verifies that WithName creates a copy with a new name.
+func TestFuncDef_WithName(t *testing.T) {
+	t.Parallel()
+
+	original := Func("go-test", "run tests", func(_ context.Context) error { return nil })
+	renamed := original.WithName("integration-test")
+
+	// Verify names are different
+	if original.Name() != "go-test" {
+		t.Errorf("original name changed: got %q, want %q", original.Name(), "go-test")
+	}
+	if renamed.Name() != "integration-test" {
+		t.Errorf("renamed name wrong: got %q, want %q", renamed.Name(), "integration-test")
+	}
+
+	// Verify they're different pointers (copy, not mutation)
+	if original == renamed {
+		t.Error("WithName should return a copy, not the same pointer")
+	}
+
+	// Verify usage is preserved
+	if renamed.Usage() != original.Usage() {
+		t.Errorf("usage not preserved: got %q, want %q", renamed.Usage(), original.Usage())
+	}
+}
+
+// TestFuncDef_WithUsage verifies that WithUsage creates a copy with new help text.
+func TestFuncDef_WithUsage(t *testing.T) {
+	t.Parallel()
+
+	original := Func("go-test", "run tests", func(_ context.Context) error { return nil })
+	modified := original.WithUsage("run unit tests only")
+
+	// Verify usages are different
+	if original.Usage() != "run tests" {
+		t.Errorf("original usage changed: got %q", original.Usage())
+	}
+	if modified.Usage() != "run unit tests only" {
+		t.Errorf("modified usage wrong: got %q", modified.Usage())
+	}
+
+	// Verify name is preserved
+	if modified.Name() != original.Name() {
+		t.Errorf("name not preserved: got %q, want %q", modified.Name(), original.Name())
+	}
+}
+
+// TestFuncDef_Chaining verifies that WithName and WithUsage can be chained.
+func TestFuncDef_Chaining(t *testing.T) {
+	t.Parallel()
+
+	original := Func("go-test", "run tests", func(_ context.Context) error { return nil })
+	chained := original.WithName("integration-test").WithUsage("run integration tests").Hidden()
+
+	if chained.Name() != "integration-test" {
+		t.Errorf("name wrong: got %q", chained.Name())
+	}
+	if chained.Usage() != "run integration tests" {
+		t.Errorf("usage wrong: got %q", chained.Usage())
+	}
+	if !chained.IsHidden() {
+		t.Error("expected hidden to be true")
+	}
+
+	// Original unchanged
+	if original.Name() != "go-test" || original.Usage() != "run tests" || original.IsHidden() {
+		t.Error("original was mutated")
+	}
+}
+
+// TestSkipTaskWithManualRun_WithName verifies the documented pattern of using
+// SkipTask + ManualRun with WithName to avoid duplicate function names.
+//
+// Pattern:
+//
+//	AutoRun: pocket.Paths(golang.Workflow()).SkipTask(golang.Test, "services/api"),
+//	ManualRun: []pocket.Runnable{pocket.Paths(golang.Test.WithName("integration-test")).In("services/api")},
+func TestSkipTaskWithManualRun_WithName(t *testing.T) {
+	t.Parallel()
+
+	// Simulate golang.Test and golang.Workflow
+	testTask := Func("go-test", "test", func(_ context.Context) error { return nil })
+	formatTask := Func("go-format", "format", func(_ context.Context) error { return nil })
+	workflow := Serial(formatTask, testTask)
+
+	// Use WithName to give the ManualRun task a distinct name
+	cfg := Config{
+		AutoRun: Paths(workflow).In("services/api").SkipTask(testTask, "services/api"),
+		ManualRun: []Runnable{
+			Paths(testTask.WithName("integration-test")).In("services/api"),
+		},
+	}
+
+	// Collect funcs as runner.go does
+	var allFuncs []*FuncDef
+	if cfg.AutoRun != nil {
+		allFuncs = append(allFuncs, cfg.AutoRun.funcs()...)
+	}
+	for _, r := range cfg.ManualRun {
+		allFuncs = append(allFuncs, r.funcs()...)
+	}
+
+	// Count occurrences of each function name
+	counts := make(map[string]int)
+	for _, f := range allFuncs {
+		counts[f.name]++
+	}
+
+	t.Logf("Function counts: %v", counts)
+
+	// Check for duplicates
+	for name, count := range counts {
+		if count > 1 {
+			t.Errorf("function %q appears %d times", name, count)
+		}
+	}
+
+	// Verify all three funcs are present with unique names
+	if counts["go-test"] != 1 {
+		t.Errorf("expected go-test once, got %d", counts["go-test"])
+	}
+	if counts["go-format"] != 1 {
+		t.Errorf("expected go-format once, got %d", counts["go-format"])
+	}
+	if counts["integration-test"] != 1 {
+		t.Errorf("expected integration-test once, got %d", counts["integration-test"])
+	}
+}

@@ -93,6 +93,37 @@ func (f *FuncDef) Hidden() *FuncDef {
 	return &cp
 }
 
+// WithName returns a copy with a different CLI name.
+// Use this when the same task needs different names in different contexts,
+// such as exposing a skipped AutoRun task under a distinct name in ManualRun.
+//
+// Example:
+//
+//	golang.Test.WithName("integration-test")  // same task, different CLI name
+func (f *FuncDef) WithName(name string) *FuncDef {
+	if name == "" {
+		panic("pocket.FuncDef.WithName: name is required")
+	}
+	cp := *f
+	cp.name = name
+	return &cp
+}
+
+// WithUsage returns a copy with different help text.
+// Use this with WithName when the renamed task needs a distinct description.
+//
+// Example:
+//
+//	golang.Test.WithName("integration-test").WithUsage("run integration tests")
+func (f *FuncDef) WithUsage(usage string) *FuncDef {
+	if usage == "" {
+		panic("pocket.FuncDef.WithUsage: usage is required")
+	}
+	cp := *f
+	cp.usage = usage
+	return &cp
+}
+
 // Name returns the function's CLI name.
 func (f *FuncDef) Name() string {
 	return f.name

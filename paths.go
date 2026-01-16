@@ -59,11 +59,15 @@ func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 // Paths support regex patterns matched against the current execution path.
 // Returns a new *PathFilter (immutable).
 //
-// Example:
+// To make skipped tasks available for manual execution, add them to ManualRun
+// with a different name using WithName():
 //
-//	pocket.Paths(golang.Workflow()).
+//	AutoRun: pocket.Paths(golang.Workflow()).
 //	    DetectBy(golang.Detect()).
-//	    SkipTask(golang.Test, "services/api", "services/worker")
+//	    SkipTask(golang.Test, "services/api", "services/worker"),
+//	ManualRun: []pocket.Runnable{
+//	    pocket.Paths(golang.Test.WithName("integration-test")).In("services/api", "services/worker"),
+//	}
 func (p *PathFilter) SkipTask(task *FuncDef, paths ...string) *PathFilter {
 	cp := p.clone()
 	if cp.skipTasks == nil {

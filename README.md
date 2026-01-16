@@ -306,17 +306,20 @@ var Config = pocket.Config{
         DetectBy(golang.Detect()).
         SkipTask(golang.Test, "services/api", "services/worker"),
 
-    // Make skipped tests available for explicit execution
+    // Make skipped tests available under a different name
     ManualRun: []pocket.Runnable{
-        pocket.Paths(golang.Test).In("services/api", "services/worker"),
+        pocket.Paths(golang.Test.WithName("integration-test")).In("services/api", "services/worker"),
     },
 }
 ```
 
 Here `services/api/` and `services/worker/` are separate Go modules detected by
 `golang.Detect()`. The full workflow (format, lint, vulncheck) runs in all
-detected modules, but `go-test` is skipped in those two. The skipped tests
-remain available via `./pok go-test` when run from those directories.
+detected modules, but `go-test` is skipped in those two. The skipped tests are
+available as `integration-test` when run from those directories.
+
+Note: `WithName()` creates a copy of the task with a different CLI name. This
+avoids duplicate names when the same task appears in both AutoRun and ManualRun.
 
 ## Options
 
@@ -387,7 +390,7 @@ var Config = pocket.Config{
 
     // ManualRun: requires ./pok <name>
     ManualRun: []pocket.Runnable{
-        pocket.Paths(golang.Test).In("services/worker"),
+        pocket.Paths(golang.Test.WithName("slow-test")).In("services/worker"),
     },
 
     // Shim: configure wrapper scripts

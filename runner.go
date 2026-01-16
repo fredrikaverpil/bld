@@ -78,6 +78,9 @@ func RunConfig(cfg Config) {
 	}
 
 	// Add manual run functions and their path mappings.
+	// Note: If the same FuncDef appears in both AutoRun and ManualRun,
+	// validateNoDuplicateFuncs will error. Use WithName() to give
+	// ManualRun tasks distinct names.
 	for _, r := range cfg.ManualRun {
 		allFuncs = append(allFuncs, r.funcs()...)
 		// Collect path mappings from ManualRun so tasks are visible in subdirectories.
