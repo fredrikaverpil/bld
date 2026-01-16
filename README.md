@@ -16,10 +16,13 @@ A cross-platform build system inspired by
 
 ## Features
 
-- **Zero-install**: The `./pok` shim bootstraps Go and all dependencies automatically
+- **Zero-install**: The `./pok` shim bootstraps Go and all dependencies
+  automatically
 - **Cross-platform**: Works on Windows, macOS, and Linux (no Makefiles)
-- **Composable**: Define functions, compose with `Serial()`/`Parallel()` - Pocket handles the execution graph
-- **Monorepo-ready**: Auto-detects directories (by go.mod, pyproject.toml, etc.) with per-directory task visibility
+- **Composable**: Define functions, compose with `Serial()`/`Parallel()` -
+  Pocket handles the execution graph
+- **Monorepo-ready**: Auto-detects directories (by go.mod, pyproject.toml, etc.)
+  with per-directory task visibility
 - **Tool management**: Downloads and caches tools in `.pocket/`
 
 ## Quickstart
@@ -34,7 +37,7 @@ go run github.com/fredrikaverpil/pocket/cmd/pocket@latest init
 
 This creates `.pocket/` and `./pok` (the wrapper script).
 
-### Your first function
+### Your first task
 
 Edit `.pocket/config.go` and add a task to your config's `ManualRun`:
 
@@ -62,9 +65,9 @@ func hello(ctx context.Context) error {
 ```
 
 ```bash
-./pok -h        # list functions
-./pok hello     # run function
-./pok hello -h  # show help for function (options, usage)
+./pok -h        # list tasks
+./pok hello     # run task
+./pok hello -h  # show help for task (options, usage)
 ./pok -v hello  # run with verbose output
 ```
 
@@ -113,7 +116,9 @@ func lint(ctx context.Context) error {
 
 ### Functions
 
-Everything in Pocket is a function created with `pocket.Func()`:
+Everything in Pocket is a function created with `pocket.Func()`. Functions are
+the building block - they become **tasks** when exposed via CLI, or **tools**
+when they install binaries:
 
 ```go
 var MyFunc = pocket.Func("name", "description", implementation)
@@ -126,7 +131,7 @@ func implementation(ctx context.Context) error {
 
 Functions can be:
 
-- **Visible**: Shown in `./pok -h` and callable from CLI
+- **Visible**: Shown in `./pok -h` as tasks, callable from CLI
 - **Hidden**: Not shown in help, used as dependencies (`.Hidden()`)
 
 ### Executing Commands
@@ -245,6 +250,38 @@ func Detect() func() []string {
 | **Tool** | Installs binary | `Name`, `Install`, optional `Config` | ruff, golangcilint |
 | **Task** | Uses tools      | FuncDefs + `Tasks()` + `Detect()`    | python, golang     |
 
+#### 3. Tool Configuration
+
+Tools that use config files can export a `ToolConfig`. Tasks then use
+`pocket.ConfigPath()` to find an existing config or create a default one:
+
+```go
+// In tool package: define where to look for config
+var Config = pocket.ToolConfig{
+    UserFiles: []string{
+        "ruff.toml",                      // relative: check in task CWD
+        pocket.FromGitRoot("ruff.toml"),  // absolute: check in repo root
+    },
+    DefaultFile: "ruff.toml",    // fallback filename
+    DefaultData: defaultConfig,  // embedded default config
+}
+
+// In task: find or create config
+func lint(ctx context.Context) error {
+    configPath, _ := pocket.ConfigPath(ctx, "ruff", ruff.Config)
+    return pocket.Exec(ctx, ruff.Name, "check", "--config", configPath, ".")
+}
+```
+
+`ConfigPath` checks each path in `UserFiles`:
+
+- **Relative paths** are resolved from the task's current directory (`Path(ctx)`)
+- **Absolute paths** are used as-is (use `FromGitRoot()` for repo-root configs)
+
+If no user config is found, it writes `DefaultData` to
+`.pocket/tools/<tool>/<DefaultFile>` and returns that path. This lets each
+directory in a monorepo have its own config, while providing sensible defaults.
+
 ### Config Usage
 
 The config ties everything together:
@@ -355,27 +392,57 @@ func deploy(ctx context.Context) error {
 
 ```go
 // Execution
-pocket.Exec(ctx, "command", "arg1", "arg2")  // run command
-pocket.Printf(ctx, "format %s", arg)          // formatted output
-pocket.Println(ctx, "message")                // line output
+pocket.Exec(ctx, "cmd", "arg1", "arg2")       // run command in current path
+pocket.ExecIn(ctx, "dir", "cmd", "args"...)   // run command in specific dir
+pocket.Command(ctx, "cmd", "args"...)         // create exec.Cmd with .pocket/bin in PATH
+pocket.Printf(ctx, "format %s", arg)          // formatted output to stdout
+pocket.Println(ctx, "message")                // line output to stdout
+
+// Context
+pocket.Options[T](ctx)        // get typed options from context
+pocket.Path(ctx)              // current path (for path-filtered functions)
+pocket.Verbose(ctx)           // whether -v flag is set
+pocket.CWD(ctx)               // where CLI was invoked (relative to git root)
 
 // Paths
 pocket.GitRoot()              // git repository root
 pocket.FromGitRoot("subdir")  // path relative to git root
 pocket.FromPocketDir("file")  // path relative to .pocket/
+pocket.FromToolsDir("tool")   // path relative to .pocket/tools/
 pocket.FromBinDir("tool")     // path relative to .pocket/bin/
-
-// Context
-pocket.Options[T](ctx)        // get typed options
-pocket.Path(ctx)              // current path (for path-filtered functions)
+pocket.BinaryName("tool")     // append .exe on Windows
 
 // Detection
-pocket.DetectByFile("go.mod")       // find dirs with file
-pocket.DetectByExtension(".lua")    // find dirs with extension
+pocket.DetectByFile("go.mod")       // find dirs containing file
+pocket.DetectByExtension(".lua")    // find dirs with file extension
 
 // Installation
-pocket.InstallGo(ctx, "pkg/path", "version")  // go install
-pocket.ConfigPath("tool", config)              // find/create config file
+pocket.InstallGo(ctx, "github.com/org/tool", "v1.0.0")  // go install
+pocket.CreateSymlink("path/to/binary")                  // symlink to .pocket/bin/
+pocket.ConfigPath(ctx, "tool", config)                   // find/create config file
+
+// Download & Extract
+pocket.Download(ctx, url,
+    pocket.WithDestDir(dir),                              // extraction destination
+    pocket.WithFormat("tar.gz"),                          // format: tar.gz, tar, zip, ""
+    pocket.WithExtract(pocket.WithExtractFile(name)),     // extract specific file
+    pocket.WithExtract(pocket.WithRenameFile(src, dest)), // rename during extract
+    pocket.WithExtract(pocket.WithFlatten()),             // flatten directory structure
+    pocket.WithSymlink(),                                 // symlink to .pocket/bin/
+    pocket.WithSkipIfExists(path),                        // skip if file exists
+    pocket.WithHTTPHeader(key, value),                    // add HTTP header
+)
+pocket.FromLocal(ctx, path, opts...)  // process local file with same options
+
+// Platform
+pocket.HostOS()                   // runtime.GOOS ("darwin", "linux", "windows")
+pocket.HostArch()                 // runtime.GOARCH ("amd64", "arm64")
+pocket.DefaultArchiveFormat()     // "zip" on Windows, "tar.gz" otherwise
+pocket.ArchToX8664(arch)          // convert "amd64" → "x86_64"
+pocket.ArchToAMD64(arch)          // convert "x86_64" → "amd64"
+
+// Module
+pocket.GoVersionFromDir("dir")    // read Go version from go.mod
 ```
 
 ### Config Structure
@@ -399,6 +466,12 @@ var Config = pocket.Config{
         Windows:    true,    // pok.cmd
         PowerShell: true,    // pok.ps1
     },
+
+    // SkipGenerate: don't run "generate" before tasks (default: false)
+    SkipGenerate: false,
+
+    // SkipGitDiff: don't fail on uncommitted changes after tasks (default: false)
+    SkipGitDiff: false,
 }
 ```
 
