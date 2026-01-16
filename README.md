@@ -291,19 +291,30 @@ pocket.Paths(golang.Workflow()).DetectBy(golang.Detect()).In("services/.*").Exce
 ### Skipping Tasks in Specific Paths
 
 While `Except()` excludes entire workflows from directories, use `SkipTask()` to
-skip specific tasks within a workflow:
+skip specific tasks within a workflow. This controls which tasks from the
+workflow run in each detected directory - it doesn't modify the task's
+arguments.
+
+For example, in a monorepo with multiple Go services (each with their own
+`go.mod`), you might want to skip slow tests in certain services:
 
 ```go
 var Config = pocket.Config{
     AutoRun: pocket.Paths(golang.Workflow()).
         DetectBy(golang.Detect()).
-        SkipTask(golang.Test, "tests/go", "tests/features").  // skip in specific dirs
-        SkipTask(golang.Vulncheck),  // skip everywhere (no paths = skip all)
+        SkipTask(golang.Test, "services/api", "services/worker"),
+
+    // Make skipped tests available for explicit execution
+    ManualRun: []pocket.Runnable{
+        pocket.Paths(golang.Test).In("services/api", "services/worker"),
+    },
 }
 ```
 
-This runs the full Go workflow in detected directories, but skips `go-test` in
-`tests/go` and `tests/features`, and skips `go-vulncheck` everywhere.
+Here `services/api/` and `services/worker/` are separate Go modules detected by
+`golang.Detect()`. The full workflow (format, lint, vulncheck) runs in all
+detected modules, but `go-test` is skipped in those two. The skipped tests
+remain available via `./pok go-test` when run from those directories.
 
 ## Options
 
@@ -368,13 +379,14 @@ pocket.ConfigPath("tool", config)              // find/create config file
 ```go
 var Config = pocket.Config{
     // AutoRun: runs on ./pok (no arguments)
-    // Use SkipTask() to skip specific tasks in specific paths
     AutoRun: pocket.Paths(golang.Workflow()).
         DetectBy(golang.Detect()).
-        SkipTask(golang.Test, "tests/go"),
+        SkipTask(golang.Test, "services/worker"),
 
     // ManualRun: requires ./pok <name>
-    ManualRun: []pocket.Runnable{...},
+    ManualRun: []pocket.Runnable{
+        pocket.Paths(golang.Test).In("services/worker"),
+    },
 
     // Shim: configure wrapper scripts
     Shim: &pocket.ShimConfig{

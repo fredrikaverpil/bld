@@ -77,9 +77,13 @@ func RunConfig(cfg Config) {
 		}).Hidden()
 	}
 
-	// Add manual run functions (if any - ManualRun is []Runnable in old Config).
+	// Add manual run functions and their path mappings.
 	for _, r := range cfg.ManualRun {
 		allFuncs = append(allFuncs, r.funcs()...)
+		// Collect path mappings from ManualRun so tasks are visible in subdirectories.
+		for name, pf := range collectPathMappings(r) {
+			pathMappings[name] = pf
+		}
 	}
 
 	// Collect built-in tasks (generate and update need Config).

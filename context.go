@@ -12,13 +12,13 @@ import (
 // execContext holds runtime state for function execution.
 // Stored in context.Context and accessed via helper functions.
 type execContext struct {
-	mode      execMode           // execution mode (execute or collect)
-	plan      *ExecutionPlan     // plan being collected (only in modeCollect)
-	out       *Output            // where to write output
-	path      string             // current path for this invocation
-	cwd       string             // where CLI was invoked (relative to git root)
-	verbose   bool               // verbose mode enabled
-	dedup     *dedupState        // shared deduplication state (thread-safe)
+	mode      execMode            // execution mode (execute or collect)
+	plan      *ExecutionPlan      // plan being collected (only in modeCollect)
+	out       *Output             // where to write output
+	path      string              // current path for this invocation
+	cwd       string              // where CLI was invoked (relative to git root)
+	verbose   bool                // verbose mode enabled
+	dedup     *dedupState         // shared deduplication state (thread-safe)
 	skipRules map[string][]string // task name -> paths to skip in (empty = skip everywhere)
 }
 

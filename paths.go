@@ -63,8 +63,7 @@ func (p *PathFilter) DetectBy(fn func() []string) *PathFilter {
 //
 //	pocket.Paths(golang.Workflow()).
 //	    DetectBy(golang.Detect()).
-//	    SkipTask(golang.Test, "tests/go", "tests/features").
-//	    SkipTask(golang.Vulncheck)  // skip everywhere
+//	    SkipTask(golang.Test, "services/api", "services/worker")
 func (p *PathFilter) SkipTask(task *FuncDef, paths ...string) *PathFilter {
 	cp := p.clone()
 	if cp.skipTasks == nil {

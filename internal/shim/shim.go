@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -86,13 +87,26 @@ func GenerateWithRoot(cfg pocket.Config, rootDir string) ([]string, error) {
 		})
 	}
 
-	// Collect all module directories from the config.
-	var moduleDirs []string
+	// Collect all module directories from the config (AutoRun + ManualRun).
+	moduleDirSet := make(map[string]bool)
+	moduleDirSet["."] = true // Always include root.
+
 	if cfg.AutoRun != nil {
-		moduleDirs = pocket.CollectModuleDirectories(cfg.AutoRun)
-	} else {
-		moduleDirs = []string{"."}
+		for _, dir := range pocket.CollectModuleDirectories(cfg.AutoRun) {
+			moduleDirSet[dir] = true
+		}
 	}
+	for _, r := range cfg.ManualRun {
+		for _, dir := range pocket.CollectModuleDirectories(r) {
+			moduleDirSet[dir] = true
+		}
+	}
+
+	moduleDirs := make([]string, 0, len(moduleDirSet))
+	for dir := range moduleDirSet {
+		moduleDirs = append(moduleDirs, dir)
+	}
+	slices.Sort(moduleDirs)
 
 	// Generate each shim type at each module directory.
 	var generatedPaths []string

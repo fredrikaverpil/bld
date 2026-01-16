@@ -286,3 +286,59 @@ func TestIsFuncVisibleIn(t *testing.T) {
 		}
 	}
 }
+
+// TestFilterFuncsByCwd_ManualRunPaths tests that ManualRun tasks with Paths
+// are visible from subdirectory shims. This simulates the documented pattern:
+//
+//	AutoRun: pocket.Paths(golang.Workflow()).DetectBy(...).SkipTask(golang.Test, "services/api"),
+//	ManualRun: []pocket.Runnable{pocket.Paths(golang.Test).In("services/api")},
+//
+// The ManualRun task should be visible when running from services/api/pok.
+func TestFilterFuncsByCwd_ManualRunPaths(t *testing.T) {
+	t.Parallel()
+
+	// Simulate AutoRun tasks (format, lint) that run in services/api.
+	formatTask := Func("go-format", "format Go files", func(_ context.Context) error { return nil })
+	lintTask := Func("go-lint", "lint Go files", func(_ context.Context) error { return nil })
+
+	// Simulate ManualRun task (test) that runs in services/api via Paths().In().
+	testTask := Func("go-test", "test Go files", func(_ context.Context) error { return nil })
+
+	// Build path mappings as runner.go would:
+	// - AutoRun contributes format and lint with paths ["services/api"]
+	// - ManualRun contributes test with paths ["services/api"]
+	autoRunMappings := collectPathMappings(Paths(Serial(formatTask, lintTask)).In("services/api"))
+	manualRunMappings := collectPathMappings(Paths(testTask).In("services/api"))
+
+	// Merge mappings (as runner.go does).
+	pathMappings := make(map[string]*PathFilter)
+	for name, pf := range autoRunMappings {
+		pathMappings[name] = pf
+	}
+	for name, pf := range manualRunMappings {
+		pathMappings[name] = pf
+	}
+
+	allFuncs := []*FuncDef{formatTask, lintTask, testTask}
+
+	// Test from services/api - all three should be visible.
+	apiVisible := filterFuncsByCwd(allFuncs, "services/api", pathMappings)
+	if len(apiVisible) != 3 {
+		t.Errorf("services/api: expected 3 visible funcs, got %d", len(apiVisible))
+	}
+	visibleNames := make(map[string]bool)
+	for _, f := range apiVisible {
+		visibleNames[f.name] = true
+	}
+	for _, name := range []string{"go-format", "go-lint", "go-test"} {
+		if !visibleNames[name] {
+			t.Errorf("services/api: expected %q to be visible", name)
+		}
+	}
+
+	// Test from root - none should be visible (all have path mappings).
+	rootVisible := filterFuncsByCwd(allFuncs, ".", pathMappings)
+	if len(rootVisible) != 0 {
+		t.Errorf("root: expected 0 visible funcs, got %d: %v", len(rootVisible), rootVisible)
+	}
+}

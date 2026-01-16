@@ -525,3 +525,124 @@ func TestGenerateWithRoot_DeeplyNested(t *testing.T) {
 		t.Errorf("deeply nested shim: expected POK_CONTEXT=%q", deepDir)
 	}
 }
+
+func TestGenerateWithRoot_ManualRunWithPaths(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	// Create .pocket directory with go.mod.
+	pocketDir := filepath.Join(tmpDir, ".pocket")
+	if err := os.MkdirAll(pocketDir, 0o755); err != nil {
+		t.Fatalf("creating .pocket dir: %v", err)
+	}
+	gomod := "module pocket\n\ngo 1.24.4\n"
+	if err := os.WriteFile(filepath.Join(pocketDir, "go.mod"), []byte(gomod), 0o644); err != nil {
+		t.Fatalf("writing go.mod: %v", err)
+	}
+
+	// Create module directories.
+	moduleDirs := []string{"services/api", "services/worker"}
+	for _, dir := range moduleDirs {
+		if err := os.MkdirAll(filepath.Join(tmpDir, dir), 0o755); err != nil {
+			t.Fatalf("creating directory %s: %v", dir, err)
+		}
+	}
+
+	// Create functions for AutoRun and ManualRun.
+	autoFunc := pocket.Func("auto-task", "auto task", func(_ context.Context) error { return nil })
+	manualFunc := pocket.Func("manual-task", "manual task", func(_ context.Context) error { return nil })
+
+	// AutoRun detects all services, ManualRun has a path-filtered task.
+	// This simulates the documented pattern:
+	//   AutoRun: pocket.Paths(golang.Workflow()).DetectBy(...).SkipTask(golang.Test, "services/api", "services/worker"),
+	//   ManualRun: []pocket.Runnable{pocket.Paths(golang.Test).In("services/api", "services/worker")},
+	cfg := pocket.Config{
+		AutoRun: pocket.Paths(autoFunc).In(moduleDirs...),
+		ManualRun: []pocket.Runnable{
+			pocket.Paths(manualFunc).In("services/api", "services/worker"),
+		},
+		Shim: &pocket.ShimConfig{
+			Name:  "pok",
+			Posix: true,
+		},
+	}
+
+	if _, err := GenerateWithRoot(cfg, tmpDir); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	// Verify shims are generated at each location.
+	// Even if ManualRun adds NEW paths not in AutoRun, shims should be generated there.
+	wantShims := []string{
+		"pok",                 // root
+		"services/api/pok",    // from AutoRun and ManualRun
+		"services/worker/pok", // from AutoRun and ManualRun
+	}
+
+	for _, shimPath := range wantShims {
+		fullPath := filepath.Join(tmpDir, shimPath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			t.Errorf("shim not generated at %q", shimPath)
+		}
+	}
+}
+
+func TestGenerateWithRoot_ManualRunOnlyPaths(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	// Create .pocket directory with go.mod.
+	pocketDir := filepath.Join(tmpDir, ".pocket")
+	if err := os.MkdirAll(pocketDir, 0o755); err != nil {
+		t.Fatalf("creating .pocket dir: %v", err)
+	}
+	gomod := "module pocket\n\ngo 1.24.4\n"
+	if err := os.WriteFile(filepath.Join(pocketDir, "go.mod"), []byte(gomod), 0o644); err != nil {
+		t.Fatalf("writing go.mod: %v", err)
+	}
+
+	// Create module directories that are ONLY in ManualRun.
+	moduleDirs := []string{"benchmarks", "integration-tests"}
+	for _, dir := range moduleDirs {
+		if err := os.MkdirAll(filepath.Join(tmpDir, dir), 0o755); err != nil {
+			t.Fatalf("creating directory %s: %v", dir, err)
+		}
+	}
+
+	// Create a simple AutoRun (root only) and ManualRun with path-filtered tasks.
+	autoFunc := pocket.Func("build", "build project", func(_ context.Context) error { return nil })
+	benchFunc := pocket.Func("benchmark", "run benchmarks", func(_ context.Context) error { return nil })
+
+	// ManualRun has paths that are NOT in AutoRun.
+	// Shims should still be generated at those paths so users can run ./pok benchmark there.
+	cfg := pocket.Config{
+		AutoRun: autoFunc, // No Paths wrapper, runs at root only
+		ManualRun: []pocket.Runnable{
+			pocket.Paths(benchFunc).In("benchmarks", "integration-tests"),
+		},
+		Shim: &pocket.ShimConfig{
+			Name:  "pok",
+			Posix: true,
+		},
+	}
+
+	if _, err := GenerateWithRoot(cfg, tmpDir); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+
+	// Shims should be generated at ManualRun paths even if not in AutoRun.
+	wantShims := []string{
+		"pok",                   // root (from AutoRun)
+		"benchmarks/pok",        // from ManualRun
+		"integration-tests/pok", // from ManualRun
+	}
+
+	for _, shimPath := range wantShims {
+		fullPath := filepath.Join(tmpDir, shimPath)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			t.Errorf("shim not generated at %q (ManualRun paths should also get shims)", shimPath)
+		}
+	}
+}
