@@ -304,18 +304,23 @@ func TestFilterFuncsByCwd_ManualRunPaths(t *testing.T) {
 	// Simulate ManualRun task (test) that runs in services/api via RunIn with Include.
 	testTask := Task("go-test", "test Go files", func(_ context.Context) error { return nil })
 
-	// Build path mappings as runner.go would:
+	// Build path mappings as runner.go would using Engine.Plan():
 	// - AutoRun contributes format and lint with paths ["services/api"]
 	// - ManualRun contributes test with paths ["services/api"]
-	autoRunMappings := collectPathMappings(RunIn(Serial(formatTask, lintTask), Include("services/api")))
-	manualRunMappings := collectPathMappings(RunIn(testTask, Include("services/api")))
+	autoRunTree := RunIn(Serial(formatTask, lintTask), Include("services/api"))
+	manualRunTree := RunIn(testTask, Include("services/api"))
+
+	autoEngine := NewEngine(autoRunTree)
+	autoPlan, _ := autoEngine.Plan(context.Background())
+	manualEngine := NewEngine(manualRunTree)
+	manualPlan, _ := manualEngine.Plan(context.Background())
 
 	// Merge mappings (as runner.go does).
 	pathMappings := make(map[string]*PathFilter)
-	for name, pf := range autoRunMappings {
+	for name, pf := range autoPlan.PathMappings() {
 		pathMappings[name] = pf
 	}
-	for name, pf := range manualRunMappings {
+	for name, pf := range manualPlan.PathMappings() {
 		pathMappings[name] = pf
 	}
 

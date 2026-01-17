@@ -161,8 +161,17 @@ func (p *PathFilter) ResolveFor(cwd string) []string {
 // run executes the inner Runnable for each resolved path.
 func (p *PathFilter) run(ctx context.Context) error {
 	ec := getExecContext(ctx)
-	paths := p.ResolveFor(ec.cwd)
 
+	// In collect mode, set path context and walk once (don't iterate paths)
+	if ec.mode == modeCollect {
+		prev := ec.plan.setPathContext(p)
+		err := p.inner.run(ctx)
+		ec.plan.setPathContext(prev)
+		return err
+	}
+
+	// Execute mode: run for each resolved path
+	paths := p.ResolveFor(ec.cwd)
 	for _, path := range paths {
 		// Create context with the current path
 		pathCtx := withPath(ctx, path)
@@ -243,14 +252,6 @@ func containsRegexMeta(s string) bool {
 	return strings.ContainsAny(s, `.+*?[](){}|^$\`)
 }
 
-// collectPathMappings walks a Runnable tree and returns a map from function name to PathFilter.
-// Functions not wrapped with Paths() are not included in the map.
-func collectPathMappings(r Runnable) map[string]*PathFilter {
-	result := make(map[string]*PathFilter)
-	collectPathMappingsRecursive(r, result, nil)
-	return result
-}
-
 // CollectModuleDirectories walks a Runnable tree and returns all unique directories
 // where functions should run. This is used for multi-module shim generation.
 func CollectModuleDirectories(r Runnable) []string {
@@ -291,48 +292,6 @@ func collectModuleDirectoriesRecursive(r Runnable, seen map[string]bool) {
 	case *parallel:
 		for _, child := range v.items {
 			collectModuleDirectoriesRecursive(child, seen)
-		}
-	}
-}
-
-// collectPathMappingsRecursive is the recursive helper for collectPathMappings.
-func collectPathMappingsRecursive(r Runnable, result map[string]*PathFilter, currentPaths *PathFilter) {
-	if r == nil {
-		return
-	}
-
-	// Check if this is a PathFilter wrapper.
-	if p, ok := r.(*PathFilter); ok {
-		currentPaths = p
-		// Continue with the inner runnable.
-		collectPathMappingsRecursive(p.inner, result, currentPaths)
-		return
-	}
-
-	// Check if this is a TaskDef.
-	if f, ok := r.(*TaskDef); ok {
-		if currentPaths != nil {
-			result[f.name] = currentPaths
-		}
-		return
-	}
-
-	// For group types, recurse into children.
-	switch v := r.(type) {
-	case *serial:
-		for _, child := range v.items {
-			collectPathMappingsRecursive(child, result, currentPaths)
-		}
-	case *parallel:
-		for _, child := range v.items {
-			collectPathMappingsRecursive(child, result, currentPaths)
-		}
-	default:
-		// For unknown types, just collect functions without path mapping.
-		for _, fn := range r.funcs() {
-			if currentPaths != nil {
-				result[fn.name] = currentPaths
-			}
 		}
 	}
 }

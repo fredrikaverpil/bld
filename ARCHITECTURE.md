@@ -235,13 +235,15 @@ Normal execution. Commands run, files are modified, output is printed.
 
 ### Collect Mode (plan)
 
-Used by `./pok plan`. Walks the tree without executing, building an
-`ExecutionPlan` for visualization:
+Used by `./pok plan` and the introspection API. Walks the tree without
+executing, building an `ExecutionPlan` for visualization and CI/CD integration:
 
 ```go
 type ExecutionPlan struct {
-    steps []PlanStep  // hierarchical tree of steps
-    stack []*PlanStep // nesting stack during collection
+    steps        []*PlanStep            // hierarchical tree of steps
+    stack        []*PlanStep            // nesting stack during collection
+    pathMappings map[string]*PathFilter // task name -> PathFilter
+    currentPaths *PathFilter            // current PathFilter context
 }
 
 type PlanStep struct {
@@ -250,9 +252,15 @@ type PlanStep struct {
     Usage    string      // description
     Hidden   bool        // installation dependency
     Deduped  bool        // would be skipped (already ran)
-    Children []PlanStep  // nested steps
+    Children []*PlanStep // nested steps
 }
 ```
+
+During collection, `PathFilter.run()` sets the path context rather than
+iterating paths. This allows the Engine to collect both the tree structure and
+path mappings in a single walk. The introspection API uses this to provide task
+information with path data for CI/CD tools like GitHub Actions matrix
+generation.
 
 ## Path Filtering
 
@@ -357,13 +365,14 @@ Execution state flows through `context.Context` via `execContext`:
 
 ```go
 type execContext struct {
-    mode    execMode            // execute or collect
-    plan    *ExecutionPlan      // plan being built (collect mode)
-    out     *Output             // stdout/stderr writers
-    path    string              // current path (set by PathFilter)
-    cwd     string              // where CLI was invoked
-    verbose bool                // verbose mode
-    dedup   *dedupState         // shared deduplication state
+    mode      execMode            // execute or collect
+    plan      *ExecutionPlan      // plan being built (collect mode)
+    out       *Output             // stdout/stderr writers
+    path      string              // current path (set by PathFilter)
+    cwd       string              // where CLI was invoked
+    verbose   bool                // verbose mode
+    dedup     *dedupState         // shared deduplication state
+    skipRules map[string][]string // task name -> paths to skip
 }
 ```
 

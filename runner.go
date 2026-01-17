@@ -40,7 +40,11 @@ func RunConfig(cfg Config) {
 
 	if cfg.AutoRun != nil {
 		allFuncs = cfg.AutoRun.funcs()
-		pathMappings = collectPathMappings(cfg.AutoRun)
+		// Use Engine.Plan() to collect path mappings (single source of truth)
+		engine := NewEngine(cfg.AutoRun)
+		if plan, err := engine.Plan(context.Background()); err == nil {
+			pathMappings = plan.PathMappings()
+		}
 		for _, f := range allFuncs {
 			autoRunNames[f.name] = true
 		}
@@ -85,8 +89,11 @@ func RunConfig(cfg Config) {
 	for _, r := range cfg.ManualRun {
 		allFuncs = append(allFuncs, r.funcs()...)
 		// Collect path mappings from ManualRun so tasks are visible in subdirectories.
-		for name, pf := range collectPathMappings(r) {
-			pathMappings[name] = pf
+		engine := NewEngine(r)
+		if plan, err := engine.Plan(context.Background()); err == nil {
+			for name, pf := range plan.PathMappings() {
+				pathMappings[name] = pf
+			}
 		}
 	}
 

@@ -22,26 +22,23 @@ type IntrospectPlan struct {
 }
 
 // CollectTasks extracts task information from a Runnable tree.
-// This uses Engine.Plan() internally to collect tasks without executing them,
-// then combines with path mappings from the static tree structure.
+// This uses Engine.Plan() internally to collect tasks without executing them.
+// Path mappings are collected during the same walk.
 // Tasks without RunIn() wrappers get ["."] (root only).
 func CollectTasks(r Runnable) ([]TaskInfo, error) {
 	if r == nil {
 		return nil, nil
 	}
 
-	// Use Engine.Plan() to collect execution plan (this includes hidden tasks)
+	// Use Engine.Plan() to collect execution plan (includes tasks and path mappings)
 	engine := NewEngine(r)
 	plan, err := engine.Plan(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	// Collect path mappings from static tree structure
-	pathMappings := collectPathMappings(r)
-
-	// Extract flattened task list from plan
-	return plan.Tasks(pathMappings), nil
+	// Extract flattened task list from plan (uses internal path mappings)
+	return plan.Tasks(), nil
 }
 
 // BuildIntrospectPlan builds the introspection plan structure from config.

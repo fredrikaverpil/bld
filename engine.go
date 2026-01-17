@@ -24,22 +24,24 @@ type PlanStep struct {
 	Usage    string      `json:"usage,omitempty"`    // Function usage/description
 	Hidden   bool        `json:"hidden,omitempty"`   // Whether this is a hidden function
 	Deduped  bool        `json:"deduped,omitempty"`  // Would be skipped due to deduplication
-	Path     string      `json:"path,omitempty"`     // Path context for path-filtered execution
 	Children []*PlanStep `json:"children,omitempty"` // Nested steps (for serial/parallel groups)
 }
 
 // ExecutionPlan holds the complete plan collected during modeCollect.
 type ExecutionPlan struct {
-	mu    sync.Mutex
-	steps []*PlanStep
-	stack []*PlanStep // Current nesting stack during collection
+	mu           sync.Mutex
+	steps        []*PlanStep
+	stack        []*PlanStep            // Current nesting stack during collection
+	pathMappings map[string]*PathFilter // Task name -> PathFilter (collected during walk)
+	currentPaths *PathFilter            // Current PathFilter context during collection
 }
 
 // newExecutionPlan creates a new empty execution plan.
 func newExecutionPlan() *ExecutionPlan {
 	return &ExecutionPlan{
-		steps: make([]*PlanStep, 0),
-		stack: make([]*PlanStep, 0),
+		steps:        make([]*PlanStep, 0),
+		stack:        make([]*PlanStep, 0),
+		pathMappings: make(map[string]*PathFilter),
 	}
 }
 
@@ -57,6 +59,27 @@ func (p *ExecutionPlan) addFunc(name, usage string, hidden, deduped bool) {
 	p.appendStep(step)
 	// Push onto stack so nested deps become children
 	p.stack = append(p.stack, step)
+
+	// Record path mapping if we're inside a PathFilter
+	if p.currentPaths != nil {
+		p.pathMappings[name] = p.currentPaths
+	}
+}
+
+// setPathContext sets the current PathFilter context for subsequent addFunc calls.
+func (p *ExecutionPlan) setPathContext(pf *PathFilter) *PathFilter {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	prev := p.currentPaths
+	p.currentPaths = pf
+	return prev
+}
+
+// PathMappings returns the collected path mappings.
+func (p *ExecutionPlan) PathMappings() map[string]*PathFilter {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pathMappings
 }
 
 // popFunc ends the current function's scope.
@@ -115,10 +138,11 @@ func (p *ExecutionPlan) Steps() []*PlanStep {
 
 // Tasks flattens the execution plan into a list of TaskInfo.
 // This extracts all func steps from the tree, combining with path information
-// from the provided pathMappings. Tasks without path mappings get ["."].
-func (p *ExecutionPlan) Tasks(pathMappings map[string]*PathFilter) []TaskInfo {
+// collected during the walk. Tasks without path mappings get ["."].
+func (p *ExecutionPlan) Tasks() []TaskInfo {
 	p.mu.Lock()
 	steps := p.steps
+	pathMappings := p.pathMappings
 	p.mu.Unlock()
 
 	var result []TaskInfo
