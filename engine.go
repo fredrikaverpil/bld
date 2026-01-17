@@ -19,32 +19,34 @@ const (
 
 // PlanStep represents a single step in the execution plan.
 type PlanStep struct {
-	Type     string      // "serial", "parallel", "func"
-	Name     string      // Function name
-	Usage    string      // Function usage/description
-	Hidden   bool        // Whether this is a hidden function
-	Deduped  bool        // Would be skipped due to deduplication
-	Path     string      // Path context for path-filtered execution
-	Children []*PlanStep // Nested steps (for serial/parallel groups)
+	Type     string      `json:"type"`               // "serial", "parallel", "func"
+	Name     string      `json:"name,omitempty"`     // Function name
+	Usage    string      `json:"usage,omitempty"`    // Function usage/description
+	Hidden   bool        `json:"hidden,omitempty"`   // Whether this is a hidden function
+	Deduped  bool        `json:"deduped,omitempty"`  // Would be skipped due to deduplication
+	Children []*PlanStep `json:"children,omitempty"` // Nested steps (for serial/parallel groups)
 }
 
 // ExecutionPlan holds the complete plan collected during modeCollect.
 type ExecutionPlan struct {
-	mu    sync.Mutex
-	steps []*PlanStep
-	stack []*PlanStep // Current nesting stack during collection
+	mu           sync.Mutex
+	steps        []*PlanStep
+	stack        []*PlanStep            // Current nesting stack during collection
+	pathMappings map[string]*PathFilter // Task name -> PathFilter (collected during walk)
+	currentPaths *PathFilter            // Current PathFilter context during collection
 }
 
 // newExecutionPlan creates a new empty execution plan.
 func newExecutionPlan() *ExecutionPlan {
 	return &ExecutionPlan{
-		steps: make([]*PlanStep, 0),
-		stack: make([]*PlanStep, 0),
+		steps:        make([]*PlanStep, 0),
+		stack:        make([]*PlanStep, 0),
+		pathMappings: make(map[string]*PathFilter),
 	}
 }
 
-// AddFunc adds a function call to the plan.
-func (p *ExecutionPlan) AddFunc(name, usage string, hidden, deduped bool) {
+// addFunc adds a function call to the plan.
+func (p *ExecutionPlan) addFunc(name, usage string, hidden, deduped bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	step := &PlanStep{
@@ -57,10 +59,31 @@ func (p *ExecutionPlan) AddFunc(name, usage string, hidden, deduped bool) {
 	p.appendStep(step)
 	// Push onto stack so nested deps become children
 	p.stack = append(p.stack, step)
+
+	// Record path mapping if we're inside a PathFilter
+	if p.currentPaths != nil {
+		p.pathMappings[name] = p.currentPaths
+	}
 }
 
-// PopFunc ends the current function's scope.
-func (p *ExecutionPlan) PopFunc() {
+// setPathContext sets the current PathFilter context for subsequent addFunc calls.
+func (p *ExecutionPlan) setPathContext(pf *PathFilter) *PathFilter {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	prev := p.currentPaths
+	p.currentPaths = pf
+	return prev
+}
+
+// PathMappings returns the collected path mappings.
+func (p *ExecutionPlan) PathMappings() map[string]*PathFilter {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.pathMappings
+}
+
+// popFunc ends the current function's scope.
+func (p *ExecutionPlan) popFunc() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if len(p.stack) > 0 {
@@ -68,8 +91,8 @@ func (p *ExecutionPlan) PopFunc() {
 	}
 }
 
-// PushSerial starts a serial group.
-func (p *ExecutionPlan) PushSerial() {
+// pushSerial starts a serial group.
+func (p *ExecutionPlan) pushSerial() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	step := &PlanStep{Type: "serial"}
@@ -77,8 +100,8 @@ func (p *ExecutionPlan) PushSerial() {
 	p.stack = append(p.stack, step)
 }
 
-// PushParallel starts a parallel group.
-func (p *ExecutionPlan) PushParallel() {
+// pushParallel starts a parallel group.
+func (p *ExecutionPlan) pushParallel() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	step := &PlanStep{Type: "parallel"}
@@ -86,8 +109,8 @@ func (p *ExecutionPlan) PushParallel() {
 	p.stack = append(p.stack, step)
 }
 
-// Pop ends the current group.
-func (p *ExecutionPlan) Pop() {
+// pop ends the current group.
+func (p *ExecutionPlan) pop() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if len(p.stack) > 0 {
@@ -111,6 +134,66 @@ func (p *ExecutionPlan) Steps() []*PlanStep {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	return p.steps
+}
+
+// Tasks flattens the execution plan into a list of TaskInfo.
+// This extracts all func steps from the tree, combining with path information
+// collected during the walk. Tasks without path mappings get ["."].
+func (p *ExecutionPlan) Tasks() []TaskInfo {
+	p.mu.Lock()
+	steps := p.steps
+	pathMappings := p.pathMappings
+	p.mu.Unlock()
+
+	var result []TaskInfo
+	seen := make(map[string]bool) // deduplicate by name
+	collectTasksFromSteps(steps, pathMappings, &result, seen)
+	return result
+}
+
+// collectTasksFromSteps recursively extracts TaskInfo from plan steps.
+func collectTasksFromSteps(
+	steps []*PlanStep,
+	pathMappings map[string]*PathFilter,
+	result *[]TaskInfo,
+	seen map[string]bool,
+) {
+	for _, step := range steps {
+		switch step.Type {
+		case "func":
+			// Skip if already seen (deduplication across plan tree)
+			if seen[step.Name] {
+				continue
+			}
+			seen[step.Name] = true
+
+			info := TaskInfo{
+				Name:   step.Name,
+				Usage:  step.Usage,
+				Hidden: step.Hidden,
+			}
+
+			// Get paths from mapping, default to ["."] for root-only tasks
+			if pf, ok := pathMappings[step.Name]; ok {
+				info.Paths = pf.Resolve()
+			} else {
+				info.Paths = []string{"."}
+			}
+
+			*result = append(*result, info)
+
+			// Recurse into nested deps
+			if len(step.Children) > 0 {
+				collectTasksFromSteps(step.Children, pathMappings, result, seen)
+			}
+
+		case "serial", "parallel":
+			// Recurse into children
+			if len(step.Children) > 0 {
+				collectTasksFromSteps(step.Children, pathMappings, result, seen)
+			}
+		}
+	}
 }
 
 // Engine orchestrates plan collection and execution.
@@ -146,11 +229,6 @@ func (e *Engine) Plan(ctx context.Context) (*ExecutionPlan, error) {
 	}
 
 	return plan, nil
-}
-
-// Execute runs the tree with normal execution.
-func (e *Engine) Execute(ctx context.Context, out *Output, cwd string, verbose bool) error {
-	return runWithContext(ctx, e.root, out, cwd, verbose)
 }
 
 // discardOutput returns an output that discards all writes.

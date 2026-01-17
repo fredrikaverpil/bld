@@ -2,6 +2,7 @@ package pocket
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -39,7 +40,11 @@ func RunConfig(cfg Config) {
 
 	if cfg.AutoRun != nil {
 		allFuncs = cfg.AutoRun.funcs()
-		pathMappings = collectPathMappings(cfg.AutoRun)
+		// Use Engine.Plan() to collect path mappings (single source of truth)
+		engine := NewEngine(cfg.AutoRun)
+		if plan, err := engine.Plan(context.Background()); err == nil {
+			pathMappings = plan.PathMappings()
+		}
 		for _, f := range allFuncs {
 			autoRunNames[f.name] = true
 		}
@@ -84,8 +89,11 @@ func RunConfig(cfg Config) {
 	for _, r := range cfg.ManualRun {
 		allFuncs = append(allFuncs, r.funcs()...)
 		// Collect path mappings from ManualRun so tasks are visible in subdirectories.
-		for name, pf := range collectPathMappings(r) {
-			pathMappings[name] = pf
+		engine := NewEngine(r)
+		if plan, err := engine.Plan(context.Background()); err == nil {
+			for name, pf := range plan.PathMappings() {
+				pathMappings[name] = pf
+			}
 		}
 	}
 
@@ -131,8 +139,10 @@ func validateNoDuplicateFuncs(funcs, builtinFuncs []*TaskDef) error {
 
 // planOptions configures the plan command.
 type planOptions struct {
-	Hidden bool `arg:"hidden" usage:"show hidden functions (e.g., install tasks)"`
-	Dedup  bool `arg:"dedup"  usage:"show deduplicated items that would be skipped"`
+	Hidden  bool   `arg:"hidden"  usage:"show hidden functions (e.g., install tasks)"`
+	Dedup   bool   `arg:"dedup"   usage:"show deduplicated items that would be skipped"`
+	JSON    bool   `arg:"json"    usage:"output as JSON for machine consumption"`
+	Outfile string `arg:"outfile" usage:"write JSON output to file (implies -json)"`
 }
 
 // builtinTasks returns the built-in tasks that are always available.
@@ -142,6 +152,35 @@ func builtinTasks(cfg *Config) []*TaskDef {
 		// plan: show the execution tree
 		Task("plan", "show the execution tree and shim locations", func(ctx context.Context) error {
 			opts := Options[planOptions](ctx)
+
+			// JSON output mode (-json or -outfile)
+			if opts.JSON || opts.Outfile != "" {
+				plan, err := BuildIntrospectPlan(*cfg)
+				if err != nil {
+					return fmt.Errorf("plan: %w", err)
+				}
+				data, err := json.MarshalIndent(plan, "", "  ")
+				if err != nil {
+					return fmt.Errorf("plan: marshal: %w", err)
+				}
+
+				// Validate the JSON output by unmarshaling it back
+				var validate IntrospectPlan
+				if err := json.Unmarshal(data, &validate); err != nil {
+					return fmt.Errorf("plan: validate: %w", err)
+				}
+
+				// Write to file or stdout
+				if opts.Outfile != "" {
+					if err := os.WriteFile(opts.Outfile, append(data, '\n'), 0o644); err != nil {
+						return fmt.Errorf("plan: write %s: %w", opts.Outfile, err)
+					}
+					Printf(ctx, "Wrote %s\n", opts.Outfile)
+				} else {
+					Printf(ctx, "%s\n", data)
+				}
+				return nil
+			}
 
 			// Print AutoRun tree using Engine
 			if cfg.AutoRun != nil {
@@ -174,7 +213,7 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			}
 
 			return nil
-		}, Opts(planOptions{})),
+		}, Opts(planOptions{}), AsSilent()),
 
 		// clean: remove .pocket/tools and .pocket/bin directories
 		Task("clean", "remove .pocket/tools and .pocket/bin directories", func(ctx context.Context) error {

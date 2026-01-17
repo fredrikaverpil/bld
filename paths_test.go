@@ -140,7 +140,7 @@ func TestRunIn_RootOnly(t *testing.T) {
 	}
 }
 
-func Test_collectPathMappings(t *testing.T) {
+func TestEngine_PathMappings(t *testing.T) {
 	fn1 := Task("fn1", "func 1", func(_ context.Context) error { return nil })
 	fn2 := Task("fn2", "func 2", func(_ context.Context) error { return nil })
 	fn3 := Task("fn3", "func 3", func(_ context.Context) error { return nil })
@@ -152,7 +152,14 @@ func Test_collectPathMappings(t *testing.T) {
 
 	// Create a serial runnable with wrapped and unwrapped funcs.
 	runnable := Serial(wrapped, fn3)
-	mappings := collectPathMappings(runnable)
+
+	// Use Engine.Plan() to collect path mappings
+	engine := NewEngine(runnable)
+	plan, err := engine.Plan(context.Background())
+	if err != nil {
+		t.Fatalf("Plan() failed: %v", err)
+	}
+	mappings := plan.PathMappings()
 
 	// fn1 and fn2 should be in mappings (from wrapped RunIn).
 	if _, ok := mappings["fn1"]; !ok {

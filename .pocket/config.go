@@ -9,15 +9,30 @@ import (
 	"github.com/fredrikaverpil/pocket/tasks/markdown"
 )
 
+// autoRun defines the tasks that run on ./pok with no arguments.
+var autoRun = pocket.Parallel(
+	pocket.RunIn(golang.Tasks(), pocket.Detect(golang.Detect())),
+	pocket.RunIn(markdown.Tasks(), pocket.Detect(markdown.Detect())),
+	pocket.WithOpts(github.Workflows, github.WorkflowsOptions{SkipPocket: true, SkipPocketMatrix: false}),
+)
+
+// matrixConfig configures GitHub Actions matrix generation.
+var matrixConfig = github.MatrixConfig{
+	DefaultPlatforms: []string{"ubuntu-latest", "macos-latest", "windows-latest"},
+	TaskOverrides: map[string]github.TaskOverride{
+		"go-lint":      {Platforms: []string{"ubuntu-latest"}},
+		"go-vulncheck": {Platforms: []string{"ubuntu-latest"}},
+		"md-format":    {Platforms: []string{"ubuntu-latest"}},
+	},
+	ExcludeTasks: []string{"github-workflows"},
+}
+
 // Config is the pocket configuration for this project.
 var Config = pocket.Config{
-	AutoRun: pocket.Parallel(
-		pocket.RunIn(golang.Tasks(), pocket.Detect(golang.Detect())),
-		pocket.RunIn(markdown.Tasks(), pocket.Detect(markdown.Detect())),
-		pocket.WithOpts(github.Workflows, github.WorkflowsOptions{SkipPocket: true}),
-	),
+	AutoRun: autoRun,
 	ManualRun: []pocket.Runnable{
 		Greet,
+		github.MatrixTask(autoRun, matrixConfig),
 	},
 	Shim: &pocket.ShimConfig{
 		Posix:      true,
