@@ -220,6 +220,20 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			return nil
 		}),
 
+		// export: output task list as JSON
+		Task("export", "export task list as JSON", func(ctx context.Context) error {
+			if cfg.AutoRun == nil {
+				Printf(ctx, "[]\n")
+				return nil
+			}
+			data, err := ExportJSON(cfg.AutoRun)
+			if err != nil {
+				return fmt.Errorf("export: %w", err)
+			}
+			Printf(ctx, "%s\n", data)
+			return nil
+		}),
+
 		// update: update pocket dependency and regenerate files
 		Task("update", "update pocket dependency and regenerate files", func(ctx context.Context) error {
 			verbose := Verbose(ctx)

@@ -18,11 +18,12 @@ var workflowTemplates embed.FS
 
 // WorkflowsOptions configures which workflows to bootstrap.
 type WorkflowsOptions struct {
-	SkipPocket  bool `arg:"skip-pocket"  usage:"exclude pocket workflow"`
-	SkipPR      bool `arg:"skip-pr"      usage:"exclude PR workflow"`
-	SkipRelease bool `arg:"skip-release" usage:"exclude release-please workflow"`
-	SkipStale   bool `arg:"skip-stale"   usage:"exclude stale workflow"`
-	SkipSync    bool `arg:"skip-sync"    usage:"exclude sync workflow"`
+	SkipPocket       bool `arg:"skip-pocket"        usage:"exclude pocket workflow"`
+	SkipPocketMatrix bool `arg:"skip-pocket-matrix" usage:"exclude pocket-matrix workflow"`
+	SkipPR           bool `arg:"skip-pr"            usage:"exclude PR workflow"`
+	SkipRelease      bool `arg:"skip-release"       usage:"exclude release-please workflow"`
+	SkipStale        bool `arg:"skip-stale"         usage:"exclude stale workflow"`
+	SkipSync         bool `arg:"skip-sync"          usage:"exclude sync workflow"`
 }
 
 // PocketConfig holds configuration for the pocket workflow template.
@@ -93,6 +94,7 @@ func runWorkflows(ctx context.Context) error {
 
 	workflowDefs := []workflowDef{
 		{"pocket.yml.tmpl", "pocket.yml", pocketConfig, !opts.SkipPocket},
+		{"pocket-matrix.yml.tmpl", "pocket-matrix.yml", nil, !opts.SkipPocketMatrix},
 		{"pr.yml.tmpl", "pr.yml", nil, !opts.SkipPR},
 		{"release.yml.tmpl", "release.yml", nil, !opts.SkipRelease},
 		{"stale.yml.tmpl", "stale.yml", staleConfig, !opts.SkipStale},
