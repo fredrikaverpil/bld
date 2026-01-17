@@ -36,6 +36,9 @@ func TestGenerateMatrix_Default(t *testing.T) {
 		if entry.Shim != "./pok" {
 			t.Errorf("expected shim './pok', got %q", entry.Shim)
 		}
+		if !entry.GitDiff {
+			t.Error("expected gitDiff to be true by default")
+		}
 	}
 }
 
@@ -277,5 +280,45 @@ func TestDefaultMatrixConfig(t *testing.T) {
 	}
 	if cfg.WindowsShell != "cmd" {
 		t.Errorf("expected default WindowsShell 'cmd', got %q", cfg.WindowsShell)
+	}
+}
+
+func TestGenerateMatrix_SkipGitDiff(t *testing.T) {
+	tasks := []pocket.TaskInfo{
+		{Name: "format", Usage: "format code"},
+		{Name: "lint", Usage: "lint code"},
+		{Name: "generate", Usage: "generate code"},
+	}
+
+	cfg := MatrixConfig{
+		DefaultPlatforms: []string{"ubuntu-latest"},
+		TaskOverrides: map[string]TaskOverride{
+			"generate": {SkipGitDiff: true}, // generators may modify files
+		},
+	}
+	data, err := GenerateMatrix(tasks, cfg)
+	if err != nil {
+		t.Fatalf("GenerateMatrix() failed: %v", err)
+	}
+
+	var output matrixOutput
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if len(output.Include) != 3 {
+		t.Fatalf("expected 3 entries, got %d", len(output.Include))
+	}
+
+	for _, entry := range output.Include {
+		if entry.Task == "generate" {
+			if entry.GitDiff {
+				t.Error("generate task should have gitDiff=false")
+			}
+		} else {
+			if !entry.GitDiff {
+				t.Errorf("%s task should have gitDiff=true", entry.Task)
+			}
+		}
 	}
 }

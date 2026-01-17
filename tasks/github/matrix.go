@@ -30,6 +30,10 @@ type TaskOverride struct {
 	// Platforms overrides DefaultPlatforms for this task.
 	// Empty means use DefaultPlatforms.
 	Platforms []string
+
+	// SkipGitDiff disables the git-diff check after this task.
+	// Useful for tasks that intentionally modify files (e.g., code generators).
+	SkipGitDiff bool
 }
 
 // DefaultMatrixConfig returns sensible defaults.
@@ -42,9 +46,10 @@ func DefaultMatrixConfig() MatrixConfig {
 
 // matrixEntry is a single entry in the GHA matrix.
 type matrixEntry struct {
-	Task string `json:"task"`
-	OS   string `json:"os"`
-	Shim string `json:"shim"`
+	Task    string `json:"task"`
+	OS      string `json:"os"`
+	Shim    string `json:"shim"`
+	GitDiff bool   `json:"gitDiff"` // whether to run git-diff after this task
 }
 
 // matrixOutput is the JSON structure for fromJson().
@@ -73,18 +78,25 @@ func GenerateMatrix(tasks []pocket.TaskInfo, cfg MatrixConfig) ([]byte, error) {
 			continue
 		}
 
+		// Get override for this task (if any)
+		override := cfg.TaskOverrides[task.Name]
+
 		// Determine platforms for this task
 		platforms := cfg.DefaultPlatforms
-		if override, ok := cfg.TaskOverrides[task.Name]; ok && len(override.Platforms) > 0 {
+		if len(override.Platforms) > 0 {
 			platforms = override.Platforms
 		}
+
+		// Determine if git-diff should run (default: true, unless overridden)
+		gitDiff := !override.SkipGitDiff
 
 		// Create entry for each platform
 		for _, platform := range platforms {
 			entries = append(entries, matrixEntry{
-				Task: task.Name,
-				OS:   platform,
-				Shim: shimForPlatform(platform, cfg.WindowsShell),
+				Task:    task.Name,
+				OS:      platform,
+				Shim:    shimForPlatform(platform, cfg.WindowsShell),
+				GitDiff: gitDiff,
 			})
 		}
 	}
