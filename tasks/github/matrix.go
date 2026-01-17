@@ -146,7 +146,10 @@ func MatrixTask(autoRun pocket.Runnable, cfg MatrixConfig) *pocket.TaskDef {
 
 func matrixCmd(autoRun pocket.Runnable, cfg MatrixConfig) pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
-		tasks := pocket.CollectTasks(autoRun)
+		tasks, err := pocket.CollectTasks(autoRun)
+		if err != nil {
+			return err
+		}
 		data, err := GenerateMatrix(tasks, cfg)
 		if err != nil {
 			return err

@@ -11,7 +11,10 @@ func TestCollectTasks_Simple(t *testing.T) {
 		return nil
 	})
 
-	tasks := CollectTasks(fn)
+	tasks, err := CollectTasks(fn)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	if len(tasks) != 1 {
 		t.Fatalf("expected 1 task, got %d", len(tasks))
@@ -36,7 +39,10 @@ func TestCollectTasks_Hidden(t *testing.T) {
 		return nil
 	}, AsHidden())
 
-	tasks := CollectTasks(fn)
+	tasks, err := CollectTasks(fn)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	// Hidden tasks are included with Hidden=true (for CI filtering)
 	if len(tasks) != 1 {
@@ -56,7 +62,10 @@ func TestCollectTasks_Serial(t *testing.T) {
 	fn3 := Task("test", "run tests", func(_ context.Context) error { return nil })
 
 	root := Serial(fn1, fn2, fn3)
-	tasks := CollectTasks(root)
+	tasks, err := CollectTasks(root)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	if len(tasks) != 3 {
 		t.Fatalf("expected 3 tasks, got %d", len(tasks))
@@ -80,7 +89,10 @@ func TestCollectTasks_Parallel(t *testing.T) {
 	fn2 := Task("test", "run tests", func(_ context.Context) error { return nil })
 
 	root := Parallel(fn1, fn2)
-	tasks := CollectTasks(root)
+	tasks, err := CollectTasks(root)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	if len(tasks) != 2 {
 		t.Fatalf("expected 2 tasks, got %d", len(tasks))
@@ -99,7 +111,10 @@ func TestCollectTasks_WithNestedDeps(t *testing.T) {
 		func(_ context.Context) error { return nil },
 	))
 
-	tasks := CollectTasks(lint)
+	tasks, err := CollectTasks(lint)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	// Both tasks are included (hidden with Hidden=true)
 	if len(tasks) != 2 {
@@ -124,7 +139,10 @@ func TestCollectTasks_WithNestedDeps(t *testing.T) {
 }
 
 func TestCollectTasks_Nil(t *testing.T) {
-	tasks := CollectTasks(nil)
+	tasks, err := CollectTasks(nil)
+	if err != nil {
+		t.Fatalf("CollectTasks() failed: %v", err)
+	}
 
 	if tasks != nil {
 		t.Errorf("expected nil for nil input, got %v", tasks)

@@ -25,24 +25,23 @@ type ExportPlan struct {
 // This uses Engine.Plan() internally to collect tasks without executing them,
 // then combines with path mappings from the static tree structure.
 // Tasks without RunIn() wrappers get ["."] (root only).
-func CollectTasks(r Runnable) []TaskInfo {
+func CollectTasks(r Runnable) ([]TaskInfo, error) {
 	if r == nil {
-		return nil
+		return nil, nil
 	}
 
 	// Use Engine.Plan() to collect execution plan (this includes hidden tasks)
 	engine := NewEngine(r)
 	plan, err := engine.Plan(context.Background())
 	if err != nil {
-		// Fall back to empty on error (shouldn't happen in practice)
-		return nil
+		return nil, err
 	}
 
 	// Collect path mappings from static tree structure
 	pathMappings := collectPathMappings(r)
 
 	// Extract flattened task list from plan
-	return plan.Tasks(pathMappings)
+	return plan.Tasks(pathMappings), nil
 }
 
 // BuildExportPlan builds the export plan structure from config.
@@ -63,7 +62,10 @@ func BuildExportPlan(cfg Config) (ExportPlan, error) {
 
 	// Export ManualRun as flat list
 	for _, r := range cfg.ManualRun {
-		tasks := CollectTasks(r)
+		tasks, err := CollectTasks(r)
+		if err != nil {
+			return export, err
+		}
 		export.ManualRun = append(export.ManualRun, tasks...)
 	}
 
