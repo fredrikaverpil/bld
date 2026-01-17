@@ -232,7 +232,7 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			}
 			Printf(ctx, "%s\n", data)
 			return nil
-		}),
+		}, AsSilent()),
 
 		// update: update pocket dependency and regenerate files
 		Task("update", "update pocket dependency and regenerate files", func(ctx context.Context) error {

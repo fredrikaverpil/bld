@@ -66,7 +66,7 @@ func GenerateMatrix(tasks []pocket.TaskInfo, cfg MatrixConfig) ([]byte, error) {
 		excludeSet[name] = true
 	}
 
-	var entries []matrixEntry
+	entries := make([]matrixEntry, 0)
 	for _, task := range tasks {
 		// Skip hidden and excluded tasks
 		if task.Hidden || excludeSet[task.Name] {
@@ -128,6 +128,7 @@ func shimForPlatform(platform, windowsShell string) string {
 func MatrixTask(autoRun pocket.Runnable, cfg MatrixConfig) *pocket.TaskDef {
 	return pocket.Task("gha-matrix", "output GitHub Actions matrix JSON",
 		matrixCmd(autoRun, cfg),
+		pocket.AsSilent(),
 	)
 }
 

@@ -47,6 +47,7 @@ type TaskDef struct {
 	body   Runnable
 	opts   any
 	hidden bool
+	silent bool // suppress task header output (for machine-readable output)
 }
 
 // TaskOpt configures a task created with Task().
@@ -120,6 +121,21 @@ func Opts(opts any) TaskOpt {
 func AsHidden() TaskOpt {
 	return func(td *TaskDef) {
 		td.hidden = true
+	}
+}
+
+// AsSilent suppresses the task header output (e.g., ":: task-name").
+// Use this for tasks that produce machine-readable output (JSON, etc.).
+//
+// Example:
+//
+//	var Matrix = pocket.Task("gha-matrix", "output GHA matrix JSON",
+//	    matrixCmd(),
+//	    pocket.AsSilent(),
+//	)
+func AsSilent() TaskOpt {
+	return func(td *TaskDef) {
+		td.silent = true
 	}
 }
 
@@ -257,8 +273,8 @@ func (f *TaskDef) run(ctx context.Context) error {
 		return nil
 	}
 
-	// Execute mode - print task header (skip for hidden tasks)
-	if !f.hidden {
+	// Execute mode - print task header (skip for hidden or silent tasks)
+	if !f.hidden && !f.silent {
 		printTaskHeader(ctx, f.name)
 	}
 
