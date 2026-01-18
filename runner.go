@@ -22,6 +22,108 @@ func RegisterGenerateAll(fn GenerateAllFunc) {
 	generateAllFn = fn
 }
 
+// ConfigPlan holds all collected data from walking a Config's task trees.
+// This is the result of the planning phase, before CLI execution.
+type ConfigPlan struct {
+	// Tasks collected from AutoRun and ManualRun trees
+	Tasks []*TaskDef
+	// AutoRunNames tracks which tasks are from AutoRun (vs ManualRun)
+	AutoRunNames map[string]bool
+	// PathMappings maps task names to their PathFilter for visibility
+	PathMappings map[string]*PathFilter
+	// AllTask is the hidden task that runs the full AutoRun tree
+	AllTask *TaskDef
+	// BuiltinTasks are always-available tasks (plan, clean, generate, etc.)
+	BuiltinTasks []*TaskDef
+}
+
+// BuildConfigPlan walks the Config's task trees and collects all data needed
+// for CLI execution. This is the single point where tree walking happens.
+func BuildConfigPlan(cfg Config) *ConfigPlan {
+	plan := &ConfigPlan{
+		Tasks:        make([]*TaskDef, 0),
+		AutoRunNames: make(map[string]bool),
+		PathMappings: make(map[string]*PathFilter),
+	}
+
+	// Phase 1: Walk AutoRun tree
+	if cfg.AutoRun != nil {
+		engine := NewEngine(cfg.AutoRun)
+		if execPlan, err := engine.Plan(context.Background()); err == nil {
+			plan.Tasks = execPlan.TaskDefs()
+			plan.PathMappings = execPlan.PathMappings()
+		}
+		for _, f := range plan.Tasks {
+			plan.AutoRunNames[f.name] = true
+		}
+	}
+
+	// Phase 2: Create the "all" task (runs generate → AutoRun → git-diff)
+	if cfg.AutoRun != nil {
+		plan.AllTask = Task("all", "run all tasks", func(ctx context.Context) error {
+			if !cfg.SkipGenerate {
+				if generateAllFn == nil {
+					return fmt.Errorf(
+						"scaffold not registered; import github.com/fredrikaverpil/pocket/internal/scaffold",
+					)
+				}
+				if _, err := generateAllFn(&cfg); err != nil {
+					return fmt.Errorf("generate: %w", err)
+				}
+			}
+			if err := cfg.AutoRun.run(ctx); err != nil {
+				return err
+			}
+			if !cfg.SkipGitDiff {
+				if err := Exec(ctx, "git", "diff", "--exit-code"); err != nil {
+					return fmt.Errorf("uncommitted changes detected; please commit or stage your changes")
+				}
+			}
+			return nil
+		}, AsHidden())
+	}
+
+	// Phase 3: Walk ManualRun trees
+	for _, r := range cfg.ManualRun {
+		engine := NewEngine(r)
+		if execPlan, err := engine.Plan(context.Background()); err == nil {
+			plan.Tasks = append(plan.Tasks, execPlan.TaskDefs()...)
+			for name, pf := range execPlan.PathMappings() {
+				plan.PathMappings[name] = pf
+			}
+		}
+	}
+
+	// Phase 4: Add built-in tasks
+	plan.BuiltinTasks = builtinTasks(&cfg)
+
+	return plan
+}
+
+// Validate checks the ConfigPlan for errors (e.g., duplicate task names).
+func (p *ConfigPlan) Validate() error {
+	seen := make(map[string]bool)
+	var duplicates []string
+
+	for _, f := range p.Tasks {
+		if seen[f.name] {
+			duplicates = append(duplicates, f.name)
+		}
+		seen[f.name] = true
+	}
+
+	for _, f := range p.BuiltinTasks {
+		if seen[f.name] {
+			duplicates = append(duplicates, f.name+" (conflicts with builtin)")
+		}
+	}
+
+	if len(duplicates) > 0 {
+		return fmt.Errorf("duplicate function names: %s", strings.Join(duplicates, ", "))
+	}
+	return nil
+}
+
 // RunConfig is the main entry point for running a pocket configuration.
 // It parses CLI flags, discovers functions, and runs the appropriate ones.
 //
@@ -33,108 +135,17 @@ func RegisterGenerateAll(fn GenerateAllFunc) {
 func RunConfig(cfg Config) {
 	cfg = cfg.WithDefaults()
 
-	// Collect all functions and path mappings from AutoRun.
-	var allFuncs []*TaskDef
-	pathMappings := make(map[string]*PathFilter)
-	autoRunNames := make(map[string]bool)
+	// Phase 1: Build the plan (walks all trees once)
+	plan := BuildConfigPlan(cfg)
 
-	if cfg.AutoRun != nil {
-		// Single walk: collect TaskDefs and path mappings together
-		engine := NewEngine(cfg.AutoRun)
-		if plan, err := engine.Plan(context.Background()); err == nil {
-			allFuncs = plan.TaskDefs()
-			pathMappings = plan.PathMappings()
-		}
-		for _, f := range allFuncs {
-			autoRunNames[f.name] = true
-		}
-	}
-
-	// Create an "all" function that runs generate → AutoRun → git-diff.
-	var allFunc *TaskDef
-	if cfg.AutoRun != nil {
-		allFunc = Task("all", "run all tasks", func(ctx context.Context) error {
-			// Run generate first (unless skipped).
-			if !cfg.SkipGenerate {
-				if generateAllFn == nil {
-					return fmt.Errorf(
-						"scaffold not registered; import github.com/fredrikaverpil/pocket/internal/scaffold",
-					)
-				}
-				if _, err := generateAllFn(&cfg); err != nil {
-					return fmt.Errorf("generate: %w", err)
-				}
-			}
-
-			// Run the AutoRun tree.
-			if err := cfg.AutoRun.run(ctx); err != nil {
-				return err
-			}
-
-			// Run git-diff at the end (unless skipped).
-			if !cfg.SkipGitDiff {
-				if err := Exec(ctx, "git", "diff", "--exit-code"); err != nil {
-					return fmt.Errorf("uncommitted changes detected; please commit or stage your changes")
-				}
-			}
-
-			return nil
-		}, AsHidden())
-	}
-
-	// Add manual run functions and their path mappings.
-	// Note: If the same TaskDef appears in both AutoRun and ManualRun,
-	// validateNoDuplicateFuncs will error. Use WithName() to give
-	// ManualRun tasks distinct names.
-	for _, r := range cfg.ManualRun {
-		// Single walk: collect TaskDefs and path mappings together
-		engine := NewEngine(r)
-		if plan, err := engine.Plan(context.Background()); err == nil {
-			allFuncs = append(allFuncs, plan.TaskDefs()...)
-			for name, pf := range plan.PathMappings() {
-				pathMappings[name] = pf
-			}
-		}
-	}
-
-	// Collect built-in tasks (generate and update need Config).
-	builtinFuncs := builtinTasks(&cfg)
-
-	// Validate no duplicate function names.
-	if err := validateNoDuplicateFuncs(allFuncs, builtinFuncs); err != nil {
+	// Phase 2: Validate
+	if err := plan.Validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "configuration error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Call the CLI main function.
-	cliMain(allFuncs, allFunc, pathMappings, autoRunNames, builtinFuncs)
-}
-
-// validateNoDuplicateFuncs checks that no two functions have the same name.
-// Returns an error listing all duplicates found.
-func validateNoDuplicateFuncs(funcs, builtinFuncs []*TaskDef) error {
-	seen := make(map[string]bool)
-	var duplicates []string
-
-	// Check user functions.
-	for _, f := range funcs {
-		if seen[f.name] {
-			duplicates = append(duplicates, f.name)
-		}
-		seen[f.name] = true
-	}
-
-	// Check built-in functions don't conflict with user functions.
-	for _, f := range builtinFuncs {
-		if seen[f.name] {
-			duplicates = append(duplicates, f.name+" (conflicts with builtin)")
-		}
-	}
-
-	if len(duplicates) > 0 {
-		return fmt.Errorf("duplicate function names: %s", strings.Join(duplicates, ", "))
-	}
-	return nil
+	// Phase 3: Run CLI
+	cliMain(plan)
 }
 
 // planOptions configures the plan command.

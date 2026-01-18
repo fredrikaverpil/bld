@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestValidateNoDuplicateFuncs(t *testing.T) {
+func TestConfigPlanValidate(t *testing.T) {
 	noop := func(_ context.Context) error { return nil }
 
 	tests := []struct {
@@ -57,7 +57,11 @@ func TestValidateNoDuplicateFuncs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateNoDuplicateFuncs(tt.funcs, tt.builtins)
+			plan := &ConfigPlan{
+				Tasks:        tt.funcs,
+				BuiltinTasks: tt.builtins,
+			}
+			err := plan.Validate()
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("expected error, got nil")

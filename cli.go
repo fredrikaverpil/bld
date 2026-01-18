@@ -43,28 +43,12 @@ func detectCwd() string {
 // cliMain is the entry point for the CLI.
 // It parses flags, handles -h/--help, and runs the specified function(s).
 // If no function is specified, runs all autorun functions.
-//
-// pathMappings maps function names to their PathFilter configuration.
-// Functions not in pathMappings are only visible when running from the git root.
-// builtinFuncs are always-available tasks shown under "Built-in tasks" in help.
-func cliMain(
-	funcs []*TaskDef,
-	allFunc *TaskDef,
-	pathMappings map[string]*PathFilter,
-	autoRunNames map[string]bool,
-	builtinFuncs []*TaskDef,
-) {
-	os.Exit(cliRun(funcs, allFunc, pathMappings, autoRunNames, builtinFuncs))
+func cliMain(plan *ConfigPlan) {
+	os.Exit(cliRun(plan))
 }
 
 // cliRun parses flags and runs functions, returning the exit code.
-func cliRun(
-	funcs []*TaskDef,
-	allFunc *TaskDef,
-	pathMappings map[string]*PathFilter,
-	autoRunNames map[string]bool,
-	builtinFuncs []*TaskDef,
-) int {
+func cliRun(plan *ConfigPlan) int {
 	verbose := flag.Bool("v", false, "verbose output")
 	help := flag.Bool("h", false, "show help")
 
@@ -72,19 +56,19 @@ func cliRun(
 	cwd := detectCwd()
 
 	// Filter functions based on cwd.
-	visibleFuncs := filterFuncsByCwd(funcs, cwd, pathMappings)
+	visibleFuncs := filterFuncsByCwd(plan.Tasks, cwd, plan.PathMappings)
 
 	flag.Usage = func() {
-		printHelp(visibleFuncs, autoRunNames, builtinFuncs)
+		printHelp(visibleFuncs, plan.AutoRunNames, plan.BuiltinTasks)
 	}
 	flag.Parse()
 
 	// Build function map for lookup (visible functions + built-in functions).
-	funcMap := make(map[string]*TaskDef, len(visibleFuncs)+len(builtinFuncs))
+	funcMap := make(map[string]*TaskDef, len(visibleFuncs)+len(plan.BuiltinTasks))
 	for _, f := range visibleFuncs {
 		funcMap[f.name] = f
 	}
-	for _, f := range builtinFuncs {
+	for _, f := range plan.BuiltinTasks {
 		funcMap[f.name] = f
 	}
 
@@ -100,7 +84,7 @@ func cliRun(
 			fmt.Fprintf(os.Stderr, "unknown function: %s\n", args[0])
 			return 1
 		}
-		printHelp(visibleFuncs, autoRunNames, builtinFuncs)
+		printHelp(visibleFuncs, plan.AutoRunNames, plan.BuiltinTasks)
 		return 0
 	}
 
@@ -113,8 +97,8 @@ func cliRun(
 
 	if len(args) == 0 {
 		// No arguments: run all autorun functions.
-		if allFunc != nil {
-			funcToRun = allFunc
+		if plan.AllTask != nil {
+			funcToRun = plan.AllTask
 		} else {
 			fmt.Fprintln(os.Stderr, "no function specified and no default function")
 			return 1

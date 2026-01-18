@@ -169,15 +169,33 @@ cancellation and clean up.
       ▼
 ┌─────────────────────────────────────────────────────────────┐
 │ RunConfig(cfg)                                              │
-│   1. Collect all TaskDefs from AutoRun tree                 │
-│   2. Build path mappings (func name → PathFilter)           │
-│   3. Add ManualRun functions                                │
-│   4. Add built-in tasks (plan, clean, generate, update)     │
-│   5. Validate no duplicate names                            │
+│   Phase 1: plan := BuildConfigPlan(cfg)                     │
+│   Phase 2: plan.Validate()                                  │
+│   Phase 3: cliMain(plan)                                    │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│ BuildConfigPlan(cfg) → *ConfigPlan                          │
+│   Phase 1: Walk AutoRun tree (single Engine.Plan() walk)    │
+│            → TaskDefs, PathMappings, ModuleDirectories      │
+│   Phase 2: Create "all" task (generate → AutoRun → git-diff)│
+│   Phase 3: Walk ManualRun trees (same consolidation)        │
+│   Phase 4: Add built-in tasks (plan, clean, generate, etc.) │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│ ConfigPlan (all CLI-ready data in one struct)               │
+│   Tasks        []*TaskDef           - all collected tasks   │
+│   AutoRunNames map[string]bool      - which are auto-run    │
+│   PathMappings map[string]*PathFilter - visibility info     │
+│   AllTask      *TaskDef             - hidden "all" task     │
+│   BuiltinTasks []*TaskDef           - plan, clean, etc.     │
 └──────────────────────────┬──────────────────────────────────┘
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ cliMain()                                                   │
+│ cliMain(plan)                                               │
 │   1. Parse flags (-h, -v)                                   │
 │   2. Detect cwd relative to git root                        │
 │   3. Filter visible functions based on cwd + PathFilters    │
@@ -244,6 +262,8 @@ type ExecutionPlan struct {
     stack        []*PlanStep            // nesting stack during collection
     pathMappings map[string]*PathFilter // task name -> PathFilter
     currentPaths *PathFilter            // current PathFilter context
+    taskDefs     []*TaskDef             // collected TaskDefs (single walk)
+    seenDefs     map[string]bool        // deduplication by name
 }
 
 type PlanStep struct {
@@ -257,10 +277,18 @@ type PlanStep struct {
 ```
 
 During collection, `PathFilter.run()` sets the path context rather than
-iterating paths. This allows the Engine to collect both the tree structure and
-path mappings in a single walk. The introspection API uses this to provide task
-information with path data for CI/CD tools like GitHub Actions matrix
-generation.
+iterating paths. This allows the Engine to collect all data products in a
+**single walk**:
+
+- `TaskDefs()` - All named tasks for CLI population
+- `PathMappings()` - Task visibility based on directories
+- `ModuleDirectories()` - Directories for shim generation (derived from PathMappings)
+
+This consolidation ensures consistency between task visibility, CLI population,
+and shim generation - they all derive from the same tree walk.
+
+The introspection API uses this to provide task information with path data for
+CI/CD tools like GitHub Actions matrix generation.
 
 ## Path Filtering
 
@@ -606,17 +634,20 @@ shim.Generate(cfg)
         │
         ├─ Read Go version from .pocket/go.mod
         ├─ Fetch Go download checksums
-        ├─ CollectModuleDirectories(cfg.AutoRun)
+        ├─ Engine.Plan(cfg.AutoRun).ModuleDirectories()
         │         │
-        │         └─ Walk Runnable tree
-        │            Find all PathFilters
-        │            Call Resolve() on each
-        │            Return unique directories
+        │         └─ Single walk collects all data
+        │            PathMappings derived from tree walk
+        │            ModuleDirectories derived from PathMappings
+        │            Returns unique directories (including ".")
         │
         └─ For each directory + shim type:
               Generate from template
               Write executable script
 ```
+
+This uses the same consolidated tree walk as CLI population, ensuring shims are
+generated in exactly the directories where tasks are visible.
 
 ## Scaffold Generation
 
@@ -697,3 +728,25 @@ func (f *TaskDef) run(ctx context.Context) error {
 
 Using `reflect.ValueOf(r).Pointer()` for deduplication enables shared references
 in complex trees including across parallel branches.
+
+### Single-Walk Consolidation
+
+Tree walking is consolidated into `Engine.Plan()` to prevent drift between
+subsystems. Rather than having separate walks for CLI population, visibility,
+and shim generation:
+
+```go
+// Before: Three separate walks, could drift
+funcs := cfg.AutoRun.funcs()                    // Walk 1
+pathMappings := engine.Plan().PathMappings()    // Walk 2
+dirs := CollectModuleDirectories(cfg.AutoRun)   // Walk 3
+
+// After: Single walk, all data derived consistently
+plan := engine.Plan()
+funcs := plan.TaskDefs()           // Same walk
+pathMappings := plan.PathMappings() // Same walk
+dirs := plan.ModuleDirectories()   // Derived from PathMappings
+```
+
+`BuildConfigPlan()` orchestrates this consolidation, producing a `ConfigPlan`
+struct with all CLI-ready data from a single tree walk per Runnable.
