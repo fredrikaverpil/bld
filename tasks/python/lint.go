@@ -23,11 +23,7 @@ var Lint = pocket.Task("py-lint", "lint Python files",
 func lintSyncCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[LintOptions](ctx)
-		args := []string{"sync", "--all-groups"}
-		if opts.PythonVersion != "" {
-			args = append(args, "--python", opts.PythonVersion)
-		}
-		return pocket.Exec(ctx, uv.Name, args...)
+		return uv.Sync(ctx, opts.PythonVersion, true)
 	})
 }
 

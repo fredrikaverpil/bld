@@ -6,14 +6,11 @@ import (
 	"testing"
 
 	"github.com/fredrikaverpil/pocket"
-	"github.com/fredrikaverpil/pocket/tools/basedpyright"
 	"github.com/fredrikaverpil/pocket/tools/bun"
 	"github.com/fredrikaverpil/pocket/tools/golangcilint"
 	"github.com/fredrikaverpil/pocket/tools/govulncheck"
 	"github.com/fredrikaverpil/pocket/tools/mdformat"
-	"github.com/fredrikaverpil/pocket/tools/mypy"
 	"github.com/fredrikaverpil/pocket/tools/prettier"
-	"github.com/fredrikaverpil/pocket/tools/ruff"
 	"github.com/fredrikaverpil/pocket/tools/stylua"
 	"github.com/fredrikaverpil/pocket/tools/uv"
 )
@@ -33,9 +30,6 @@ var tools = []toolTest{
 	{"govulncheck", govulncheck.Install, govulncheck.Name, []string{"-version"}, nil},
 	{"uv", uv.Install, uv.Name, []string{"--version"}, nil},
 	{"mdformat", mdformat.Install, mdformat.Name, []string{"--version"}, nil},
-	{"ruff", ruff.Install, ruff.Name, []string{"--version"}, nil},
-	{"mypy", mypy.Install, mypy.Name, []string{"--version"}, nil},
-	{"basedpyright", basedpyright.Install, basedpyright.Name, []string{"--version"}, nil},
 	{"stylua", stylua.Install, stylua.Name, []string{"--version"}, nil},
 	{"bun", bun.Install, bun.Name, []string{"--version"}, nil},
 	{"prettier", prettier.Install, prettier.Name, []string{"--version"}, prettier.Exec},

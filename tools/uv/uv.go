@@ -12,13 +12,17 @@
 //	uv.PipInstall(ctx, venvDir, "ruff==0.14.0")
 //	// Then run via pocket.Exec(ctx, "ruff", args...)
 //
-// ## Project Tools (.venv/)
+// ## Project Tools (.pocket/venvs/)
 //
 // For tools defined in pyproject.toml (project-specific versions):
 //
-//	// In task body:
-//	pocket.Exec(ctx, uv.Name, "sync", "--all-groups", "--python", "3.9")
-//	uv.Run(ctx, "3.9", "ruff", "check", ".")  // Runs from project .venv
+//	uv.Sync(ctx, "3.9", true)                 // Syncs to .pocket/venvs/3.9/
+//	uv.Run(ctx, "3.9", "ruff", "check", ".")  // Runs from .pocket/venvs/3.9/
+//
+// Project venvs are stored in .pocket/venvs/<version>/ to:
+//   - Avoid conflicts with user's .venv/
+//   - Support parallel execution across Python versions
+//   - Keep pocket-managed files organized
 //
 // The project mode is preferred when the project's pyproject.toml already
 // defines dev dependencies, as it respects project-specific tool versions.
@@ -43,7 +47,7 @@ const Version = "0.7.13"
 // This ensures reproducibility by never falling back to system Python.
 //
 // renovate: datasource=github-releases depName=python/cpython
-const DefaultPythonVersion = "3.14"
+const DefaultPythonVersion = "3.14.2"
 
 // Install ensures uv is available.
 var Install = pocket.Task("install:uv", "install uv",
@@ -114,18 +118,52 @@ func BinaryPath(venvDir, name string) string {
 	return filepath.Join(venvDir, "bin", name)
 }
 
-// Run executes a command using uv run (from the project venv).
-// If pythonVersion is specified, it's passed via --python flag.
-// NOTE: Callers must ensure uv.Install has been composed as a dependency,
-// and that uv sync has been run to install project dependencies.
-func Run(ctx context.Context, pythonVersion string, cmd string, args ...string) error {
-	uvArgs := []string{"run"}
-	if pythonVersion != "" {
-		uvArgs = append(uvArgs, "--python", pythonVersion)
+// ProjectVenvPath returns the path to the project venv for a Python version.
+// Venvs are stored in .pocket/venvs/<version>/ to support parallel execution
+// across Python versions and avoid conflicts with user's .venv/.
+// If pythonVersion is empty, DefaultPythonVersion is used.
+func ProjectVenvPath(pythonVersion string) string {
+	if pythonVersion == "" {
+		pythonVersion = DefaultPythonVersion
 	}
-	uvArgs = append(uvArgs, cmd)
+	return pocket.FromPocketDir("venvs", pythonVersion)
+}
+
+// Sync runs uv sync to install project dependencies into .pocket/venvs/<version>/.
+// If allGroups is true, --all-groups is passed to install dev dependencies.
+// NOTE: Callers must ensure uv.Install has been composed as a dependency.
+func Sync(ctx context.Context, pythonVersion string, allGroups bool) error {
+	if pythonVersion == "" {
+		pythonVersion = DefaultPythonVersion
+	}
+
+	args := []string{"sync", "--python", pythonVersion}
+	if allGroups {
+		args = append(args, "--all-groups")
+	}
+
+	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
+	cmd := pocket.Command(ctx, Name, args...)
+	cmd.Env = append(cmd.Env, "UV_PROJECT_ENVIRONMENT="+ProjectVenvPath(pythonVersion))
+	return cmd.Run()
+}
+
+// Run executes a command using uv run from .pocket/venvs/<version>/.
+// If pythonVersion is empty, DefaultPythonVersion is used.
+// NOTE: Callers must ensure uv.Install has been composed as a dependency,
+// and that Sync has been run to install project dependencies.
+func Run(ctx context.Context, pythonVersion, cmd string, args ...string) error {
+	if pythonVersion == "" {
+		pythonVersion = DefaultPythonVersion
+	}
+
+	uvArgs := []string{"run", "--python", pythonVersion, cmd}
 	uvArgs = append(uvArgs, args...)
-	return pocket.Exec(ctx, Name, uvArgs...)
+
+	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
+	command := pocket.Command(ctx, Name, uvArgs...)
+	command.Env = append(command.Env, "UV_PROJECT_ENVIRONMENT="+ProjectVenvPath(pythonVersion))
+	return command.Run()
 }
 
 func platformArch() string {

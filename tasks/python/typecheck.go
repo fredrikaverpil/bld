@@ -22,11 +22,7 @@ var Typecheck = pocket.Task("py-typecheck", "type-check Python files",
 func typecheckSyncCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[TypecheckOptions](ctx)
-		args := []string{"sync", "--all-groups"}
-		if opts.PythonVersion != "" {
-			args = append(args, "--python", opts.PythonVersion)
-		}
-		return pocket.Exec(ctx, uv.Name, args...)
+		return uv.Sync(ctx, opts.PythonVersion, true)
 	})
 }
 

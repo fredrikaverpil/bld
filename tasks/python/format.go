@@ -9,7 +9,7 @@ import (
 
 // FormatOptions configures the py-format task.
 type FormatOptions struct {
-	PythonVersion string `arg:"python"      usage:"Python version (for target-version inference)"`
+	PythonVersion string `arg:"python" usage:"Python version (for target-version inference)"`
 }
 
 // Format formats Python files using ruff format.
@@ -22,11 +22,7 @@ var Format = pocket.Task("py-format", "format Python files",
 func formatSyncCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[FormatOptions](ctx)
-		args := []string{"sync", "--all-groups"}
-		if opts.PythonVersion != "" {
-			args = append(args, "--python", opts.PythonVersion)
-		}
-		return pocket.Exec(ctx, uv.Name, args...)
+		return uv.Sync(ctx, opts.PythonVersion, true)
 	})
 }
 
