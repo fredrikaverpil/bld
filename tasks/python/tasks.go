@@ -1,4 +1,17 @@
 // Package python provides Python-related build tasks using ruff and mypy.
+//
+// # Python Version
+//
+// All tasks in this package must support a PythonVersion option in their
+// options struct. This ensures reproducible builds by explicitly specifying
+// which Python version to use, rather than falling back to system defaults.
+//
+// When adding a new task:
+//  1. Add PythonVersion string field to the task's options struct
+//  2. Wire it to the appropriate tool flag (e.g., --python, --target-version)
+//  3. Update Tasks() to pass pythonVersion to the new task's options
+//
+// See [WithPythonVersion] for setting the version across all tasks.
 package python
 
 import (
