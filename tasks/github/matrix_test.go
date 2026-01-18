@@ -2,6 +2,7 @@ package github
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/fredrikaverpil/pocket"
@@ -321,4 +322,107 @@ func TestGenerateMatrix_SkipGitDiff(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestGenerateMatrix_TaskOverridesRegexp(t *testing.T) {
+	tasks := []pocket.TaskInfo{
+		{Name: "py-test:3.9", Usage: "test python 3.9"},
+		{Name: "py-test:3.10", Usage: "test python 3.10"},
+		{Name: "py-test:3.11", Usage: "test python 3.11"},
+		{Name: "go-lint", Usage: "lint go code"},
+	}
+
+	cfg := MatrixConfig{
+		DefaultPlatforms: []string{"ubuntu-latest", "macos-latest", "windows-latest"},
+		TaskOverrides: map[string]TaskOverride{
+			"py-test:.*": {SkipGitDiff: true}, // regexp: match all py-test variants
+			"go-lint":    {Platforms: []string{"ubuntu-latest"}},
+		},
+	}
+	data, err := GenerateMatrix(tasks, cfg)
+	if err != nil {
+		t.Fatalf("GenerateMatrix() failed: %v", err)
+	}
+
+	var output matrixOutput
+	if err := json.Unmarshal(data, &output); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	// py-test:3.9, py-test:3.10, py-test:3.11: 3 platforms each = 9 entries
+	// go-lint: 1 platform = 1 entry
+	// Total: 10 entries
+	if len(output.Include) != 10 {
+		t.Fatalf("expected 10 entries, got %d", len(output.Include))
+	}
+
+	// Verify py-test tasks have SkipGitDiff applied
+	for _, entry := range output.Include {
+		if strings.HasPrefix(entry.Task, "py-test:") {
+			if entry.GitDiff {
+				t.Errorf("%s should have gitDiff=false (matched by py-test:.*)", entry.Task)
+			}
+		} else if entry.Task == "go-lint" {
+			if entry.OS != "ubuntu-latest" {
+				t.Errorf("go-lint should only run on ubuntu-latest, got %q", entry.OS)
+			}
+			if !entry.GitDiff {
+				t.Error("go-lint should have gitDiff=true")
+			}
+		}
+	}
+}
+
+func TestGetTaskOverride(t *testing.T) {
+	overrides := map[string]TaskOverride{
+		"py-test:.*":  {SkipGitDiff: true},
+		"go-.*":       {Platforms: []string{"ubuntu-latest"}},
+		"exact-match": {SkipGitDiff: true, Platforms: []string{"macos-latest"}},
+	}
+
+	tests := []struct {
+		taskName       string
+		wantMatch      bool
+		wantSkipGitDiff bool
+	}{
+		{"py-test:3.9", true, true},
+		{"py-test:3.10", true, true},
+		{"py-test:3.11", true, true},
+		{"go-lint", true, false},
+		{"go-test", true, false},
+		{"go-format", true, false},
+		{"exact-match", true, true},
+		{"no-match", false, false},
+		{"py-test", false, false}, // doesn't match "py-test:.*" (requires colon)
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.taskName, func(t *testing.T) {
+			override := getTaskOverride(tt.taskName, overrides)
+			gotMatch := override.SkipGitDiff || len(override.Platforms) > 0
+			if gotMatch != tt.wantMatch {
+				t.Errorf("getTaskOverride(%q) match=%v, want match=%v", tt.taskName, gotMatch, tt.wantMatch)
+			}
+			if override.SkipGitDiff != tt.wantSkipGitDiff {
+				t.Errorf("getTaskOverride(%q) SkipGitDiff=%v, want %v", tt.taskName, override.SkipGitDiff, tt.wantSkipGitDiff)
+			}
+		})
+	}
+}
+
+func TestGetTaskOverride_InvalidRegexp(t *testing.T) {
+	overrides := map[string]TaskOverride{
+		"[invalid": {SkipGitDiff: true}, // invalid regexp
+		"valid":    {Platforms: []string{"ubuntu-latest"}},
+	}
+
+	// Should not panic, just skip invalid patterns
+	override := getTaskOverride("valid", overrides)
+	if len(override.Platforms) != 1 || override.Platforms[0] != "ubuntu-latest" {
+		t.Errorf("expected valid pattern to match, got %+v", override)
+	}
+
+	// Invalid pattern should be skipped
+	override = getTaskOverride("[invalid", overrides)
+	// This might or might not match depending on iteration order, but shouldn't panic
 }

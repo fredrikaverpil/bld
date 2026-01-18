@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"encoding/json"
+	"regexp"
 	"strings"
 
 	"github.com/fredrikaverpil/pocket"
@@ -14,6 +15,8 @@ type MatrixConfig struct {
 	DefaultPlatforms []string
 
 	// TaskOverrides provides per-task platform configuration.
+	// Keys are treated as regular expressions and matched against task names.
+	// Example: "py-test:.*" matches "py-test:3.9", "py-test:3.10", etc.
 	TaskOverrides map[string]TaskOverride
 
 	// ExcludeTasks removes tasks from the matrix entirely.
@@ -78,8 +81,8 @@ func GenerateMatrix(tasks []pocket.TaskInfo, cfg MatrixConfig) ([]byte, error) {
 			continue
 		}
 
-		// Get override for this task (if any)
-		override := cfg.TaskOverrides[task.Name]
+		// Get override for this task (if any) using regexp matching
+		override := getTaskOverride(task.Name, cfg.TaskOverrides)
 
 		// Determine platforms for this task
 		platforms := cfg.DefaultPlatforms
@@ -102,6 +105,22 @@ func GenerateMatrix(tasks []pocket.TaskInfo, cfg MatrixConfig) ([]byte, error) {
 	}
 
 	return json.Marshal(matrixOutput{Include: entries})
+}
+
+// getTaskOverride finds the TaskOverride for a task name by matching against
+// the patterns in TaskOverrides. Patterns are regular expressions.
+func getTaskOverride(taskName string, overrides map[string]TaskOverride) TaskOverride {
+	for pattern, override := range overrides {
+		re, err := regexp.Compile("^" + pattern + "$")
+		if err != nil {
+			// Invalid pattern, skip
+			continue
+		}
+		if re.MatchString(taskName) {
+			return override
+		}
+	}
+	return TaskOverride{}
 }
 
 // shimForPlatform returns the appropriate shim command for the platform.
