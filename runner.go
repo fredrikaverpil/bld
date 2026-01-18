@@ -269,6 +269,9 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			cmd := Command(ctx, "go", "get", "-u", "github.com/fredrikaverpil/pocket@latest")
 			cmd.Dir = pocketDir
 			cmd.Env = append(cmd.Env, "GOPROXY=direct")
+			out := GetOutput(ctx)
+			cmd.Stdout = out.Stdout
+			cmd.Stderr = out.Stderr
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("go get -u: %w", err)
 			}
