@@ -488,6 +488,8 @@ func deploy(ctx context.Context) error {
 // Composition
 pocket.Serial(task1, task2, task3)     // run in sequence
 pocket.Parallel(task1, task2, task3)   // run concurrently
+pocket.Clone(task, opts...)            // copy task with modifications (Named, Opts, etc.)
+pocket.WithOpts(task, opts)            // copy task with new options struct
 
 // Command execution (returns Runnable)
 pocket.Run("cmd", "arg1", "arg2")     // static command
