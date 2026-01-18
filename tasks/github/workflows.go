@@ -19,11 +19,16 @@ var workflowTemplates embed.FS
 // WorkflowsOptions configures which workflows to bootstrap.
 type WorkflowsOptions struct {
 	SkipPocket       bool `arg:"skip-pocket"        usage:"exclude pocket workflow"`
-	SkipPocketMatrix bool `arg:"skip-pocket-matrix" usage:"exclude pocket-matrix workflow"`
+	SkipPocketMatrix bool `arg:"skip-pocket-matrix" usage:"exclude pocket-matrix workflow (excluded by default)"`
 	SkipPR           bool `arg:"skip-pr"            usage:"exclude PR workflow"`
 	SkipRelease      bool `arg:"skip-release"       usage:"exclude release-please workflow"`
 	SkipStale        bool `arg:"skip-stale"         usage:"exclude stale workflow"`
 	SkipSync         bool `arg:"skip-sync"          usage:"exclude sync workflow"`
+
+	// IncludePocketMatrix enables the pocket-matrix workflow (disabled by default).
+	// The matrix workflow is more complex and intended for projects that need
+	// fine-grained control over which tasks run on which platforms.
+	IncludePocketMatrix bool `arg:"include-pocket-matrix" usage:"include pocket-matrix workflow (excluded by default)"`
 }
 
 // PocketConfig holds configuration for the pocket workflow template.
@@ -92,9 +97,13 @@ func runWorkflows(ctx context.Context) error {
 	pocketConfig := DefaultPocketConfig()
 	staleConfig := DefaultStaleConfig()
 
+	// Include pocket-matrix only if explicitly requested via IncludePocketMatrix.
+	// SkipPocketMatrix is kept for backwards compatibility but IncludePocketMatrix takes precedence.
+	includePocketMatrix := opts.IncludePocketMatrix && !opts.SkipPocketMatrix
+
 	workflowDefs := []workflowDef{
 		{"pocket.yml.tmpl", "pocket.yml", pocketConfig, !opts.SkipPocket},
-		{"pocket-matrix.yml.tmpl", "pocket-matrix.yml", nil, !opts.SkipPocketMatrix},
+		{"pocket-matrix.yml.tmpl", "pocket-matrix.yml", nil, includePocketMatrix},
 		{"pr.yml.tmpl", "pr.yml", nil, !opts.SkipPR},
 		{"release.yml.tmpl", "release.yml", nil, !opts.SkipRelease},
 		{"stale.yml.tmpl", "stale.yml", staleConfig, !opts.SkipStale},

@@ -84,8 +84,6 @@ func Tasks(opts ...Option) pocket.Runnable {
 	}
 
 	// Build options for each task, merging pythonVersion with any explicit options
-	syncOpts := SyncOptions{PythonVersion: cfg.pythonVersion}
-
 	formatOpts := cfg.format
 	if cfg.pythonVersion != "" && formatOpts.PythonVersion == "" {
 		formatOpts.PythonVersion = cfg.pythonVersion
@@ -106,9 +104,9 @@ func Tasks(opts ...Option) pocket.Runnable {
 		testOpts.PythonVersion = cfg.pythonVersion
 	}
 
-	// Run sync first, then format, lint, typecheck, test (serial since format/lint modify files)
+	// Run format, lint, typecheck, test (serial since format/lint modify files)
+	// Each task handles its own uv.Sync internally
 	return pocket.Serial(
-		pocket.WithOpts(Sync, syncOpts),
 		pocket.WithOpts(Format, formatOpts),
 		pocket.WithOpts(Lint, lintOpts),
 		pocket.WithOpts(Typecheck, typecheckOpts),
