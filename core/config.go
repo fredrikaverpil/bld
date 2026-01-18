@@ -1,11 +1,11 @@
-package config
+package core
 
 import (
 	"context"
 	"fmt"
 	"os"
 
-	"github.com/fredrikaverpil/pocket/pocket/pk"
+	"github.com/fredrikaverpil/pocket/pk"
 )
 
 // Config represents the Pocket configuration.

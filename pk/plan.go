@@ -1,0 +1,106 @@
+package pk
+
+import "context"
+
+// plan represents the execution plan created from a Config.
+// It preserves the composition tree structure while extracting metadata.
+// The plan is created once by analyzing both the Config and filesystem,
+// then reused throughout execution.
+type plan struct {
+	// Root is the composition tree that preserves dependencies and structure.
+	// Execution walks this tree, respecting Serial/Parallel composition.
+	Root Runnable
+
+	// Tasks is a flat list of all tasks for lookup, CLI dispatch, and help.
+	// This is extracted from walking the Root tree.
+	Tasks []*Task
+
+	// PathMappings maps task names to their execution directories.
+	// TODO: Will be populated during filesystem analysis.
+	PathMappings map[string]pathInfo
+
+	// ModuleDirectories lists directories where shims should be generated.
+	// TODO: Will be derived from PathMappings.
+	ModuleDirectories []string
+}
+
+// pathInfo describes where a task should execute.
+// TODO: Will be expanded with include/exclude patterns, detection functions.
+type pathInfo struct {
+	// Paths is the list of directories where this task should run.
+	// Paths are relative to git root.
+	Paths []string
+}
+
+// NewPlan creates an execution plan from a Config root.
+// It walks the composition tree to extract tasks and analyzes the filesystem.
+// The filesystem is traversed ONCE during plan creation.
+func NewPlan(ctx context.Context, root Runnable) (*plan, error) {
+	if root == nil {
+		return &plan{
+			Root:              nil,
+			Tasks:             []*Task{},
+			PathMappings:      make(map[string]pathInfo),
+			ModuleDirectories: []string{},
+		}, nil
+	}
+
+	collector := &planCollector{
+		tasks: make([]*Task, 0),
+	}
+
+	if err := collector.walk(ctx, root); err != nil {
+		return nil, err
+	}
+
+	// TODO: Analyze filesystem and populate PathMappings
+	// TODO: Derive ModuleDirectories from PathMappings
+
+	return &plan{
+		Root:              root, // Preserve the composition tree!
+		Tasks:             collector.tasks,
+		PathMappings:      make(map[string]pathInfo),
+		ModuleDirectories: []string{},
+	}, nil
+}
+
+// planCollector is the internal state for walking the tree
+type planCollector struct {
+	tasks []*Task
+}
+
+// walk recursively traverses the Runnable tree
+func (pc *planCollector) walk(ctx context.Context, r Runnable) error {
+	if r == nil {
+		return nil
+	}
+
+	// Type switch on the concrete Runnable types
+	switch v := r.(type) {
+	case *Task:
+		// Leaf node - collect the task
+		pc.tasks = append(pc.tasks, v)
+
+	case *serial:
+		// Composition node - walk children sequentially
+		for _, child := range v.runnables {
+			if err := pc.walk(ctx, child); err != nil {
+				return err
+			}
+		}
+
+	case *parallel:
+		// Composition node - walk children (order doesn't matter for collection)
+		for _, child := range v.runnables {
+			if err := pc.walk(ctx, child); err != nil {
+				return err
+			}
+		}
+
+	default:
+		// Unknown runnable type - skip it
+		// This allows new types to be added without breaking plan building
+	}
+
+	return nil
+}
