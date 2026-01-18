@@ -2,6 +2,7 @@ package pocket
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 )
@@ -58,6 +59,51 @@ func TestComputeColorEnv(t *testing.T) {
 				}
 			} else if len(got) != 0 {
 				t.Errorf("expected no color env vars, got %v", got)
+			}
+		})
+	}
+}
+
+func TestCommandDir(t *testing.T) {
+	// Save and restore POK_CONTEXT.
+	original := os.Getenv("POK_CONTEXT")
+	defer os.Setenv("POK_CONTEXT", original)
+
+	gitRoot := GitRoot()
+
+	tests := []struct {
+		name       string
+		pokContext string
+		want       string
+	}{
+		{
+			name:       "empty POK_CONTEXT returns git root",
+			pokContext: "",
+			want:       gitRoot,
+		},
+		{
+			name:       "dot POK_CONTEXT returns git root",
+			pokContext: ".",
+			want:       gitRoot,
+		},
+		{
+			name:       "nested path returns git root joined with path",
+			pokContext: "services/api",
+			want:       filepath.Join(gitRoot, "services", "api"),
+		},
+		{
+			name:       "single directory returns git root joined with path",
+			pokContext: "subproject",
+			want:       filepath.Join(gitRoot, "subproject"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("POK_CONTEXT", tt.pokContext)
+			got := commandDir()
+			if got != tt.want {
+				t.Errorf("commandDir() = %q, want %q", got, tt.want)
 			}
 		})
 	}
