@@ -31,7 +31,10 @@ func lintCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[LintOptions](ctx)
 
-		args := []string{"check"}
+		args := []string{
+			"check",
+			"--exclude", ".pocket", // Exclude pocket-managed directories
+		}
 		if pocket.Verbose(ctx) {
 			args = append(args, "--verbose")
 		}

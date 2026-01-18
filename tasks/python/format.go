@@ -30,7 +30,10 @@ func formatCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[FormatOptions](ctx)
 
-		args := []string{"format"}
+		args := []string{
+			"format",
+			"--exclude", ".pocket", // Exclude pocket-managed directories
+		}
 		if pocket.Verbose(ctx) {
 			args = append(args, "--verbose")
 		}

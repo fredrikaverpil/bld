@@ -30,7 +30,9 @@ func typecheckCmd() pocket.Runnable {
 	return pocket.Do(func(ctx context.Context) error {
 		opts := pocket.Options[TypecheckOptions](ctx)
 
-		args := []string{}
+		args := []string{
+			"--exclude", `\.pocket/`, // Exclude pocket-managed directories
+		}
 		if pocket.Verbose(ctx) {
 			args = append(args, "-v")
 		}

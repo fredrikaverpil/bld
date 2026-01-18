@@ -137,6 +137,11 @@ func Sync(ctx context.Context, pythonVersion string, allGroups bool) error {
 		pythonVersion = DefaultPythonVersion
 	}
 
+	venvPath := ProjectVenvPath(pythonVersion)
+	if pocket.Verbose(ctx) {
+		pocket.Printf(ctx, "Syncing Python %s dependencies to %s\n", pythonVersion, venvPath)
+	}
+
 	args := []string{"sync", "--python", pythonVersion}
 	if allGroups {
 		args = append(args, "--all-groups")
@@ -144,7 +149,7 @@ func Sync(ctx context.Context, pythonVersion string, allGroups bool) error {
 
 	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
 	cmd := pocket.Command(ctx, Name, args...)
-	cmd.Env = append(cmd.Env, "UV_PROJECT_ENVIRONMENT="+ProjectVenvPath(pythonVersion))
+	cmd.Env = append(cmd.Env, "UV_PROJECT_ENVIRONMENT="+venvPath)
 	return cmd.Run()
 }
 
@@ -157,12 +162,17 @@ func Run(ctx context.Context, pythonVersion, cmd string, args ...string) error {
 		pythonVersion = DefaultPythonVersion
 	}
 
+	venvPath := ProjectVenvPath(pythonVersion)
+	if pocket.Verbose(ctx) {
+		pocket.Printf(ctx, "Running %s from %s\n", cmd, venvPath)
+	}
+
 	uvArgs := []string{"run", "--python", pythonVersion, cmd}
 	uvArgs = append(uvArgs, args...)
 
 	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
 	command := pocket.Command(ctx, Name, uvArgs...)
-	command.Env = append(command.Env, "UV_PROJECT_ENVIRONMENT="+ProjectVenvPath(pythonVersion))
+	command.Env = append(command.Env, "UV_PROJECT_ENVIRONMENT="+venvPath)
 	return command.Run()
 }
 
