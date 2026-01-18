@@ -77,6 +77,9 @@ func newCommand(ctx context.Context, name string, args ...string) *exec.Cmd {
 	}
 
 	cmd := exec.CommandContext(ctx, name, args...)
+	// Run from the project root (parent of .pocket/), not from inside .pocket/.
+	// This ensures commands find project files like pyproject.toml, src/, etc.
+	cmd.Dir = filepath.Dir(FromPocketDir())
 	cmd.Env = env
 	setGracefulShutdown(cmd)
 	return cmd
