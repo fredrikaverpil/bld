@@ -14,6 +14,12 @@ A cross-platform build system inspired by
 > Under heavy development. Breaking changes will occur until the initial
 > release.
 
+## TODOS
+
+- [ ] If the plan GHA workflow fails, the job still passes, see
+      [here](https://github.com/fredrikaverpil/creosote/actions/runs/21112089712/job/60712175285?pr=350).
+- [ ] Clean up docs; add diagrams.
+
 ## Features
 
 - **Zero-install**: The `./pok` shim bootstraps Go and all dependencies
