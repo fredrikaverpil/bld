@@ -215,21 +215,15 @@ func builtinTasks(cfg *Config) []*TaskDef {
 			return nil
 		}, Opts(planOptions{}), AsSilent()),
 
-		// clean: remove .pocket/tools and .pocket/bin directories
-		Task("clean", "remove .pocket/tools and .pocket/bin directories", func(ctx context.Context) error {
-			toolsDir := FromToolsDir()
-			if _, err := os.Stat(toolsDir); err == nil {
-				if err := os.RemoveAll(toolsDir); err != nil {
-					return fmt.Errorf("remove tools dir: %w", err)
+		// clean: remove .pocket/tools, .pocket/bin, and .pocket/venvs directories
+		Task("clean", "remove .pocket/tools, .pocket/bin, and .pocket/venvs directories", func(ctx context.Context) error {
+			for _, dir := range []string{FromToolsDir(), FromBinDir(), FromPocketDir("venvs")} {
+				if _, err := os.Stat(dir); err == nil {
+					if err := os.RemoveAll(dir); err != nil {
+						return fmt.Errorf("remove %s: %w", dir, err)
+					}
+					Printf(ctx, "Removed %s\n", dir)
 				}
-				Printf(ctx, "Removed %s\n", toolsDir)
-			}
-			binDir := FromBinDir()
-			if _, err := os.Stat(binDir); err == nil {
-				if err := os.RemoveAll(binDir); err != nil {
-					return fmt.Errorf("remove bin dir: %w", err)
-				}
-				Printf(ctx, "Removed %s\n", binDir)
 			}
 			return nil
 		}),
