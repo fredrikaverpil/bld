@@ -27,4 +27,5 @@ jobs:
           go-version-file: .pocket/go.mod
           cache-dependency-path: '**/go.sum'
       - name: Run pocket
+        shell: bash
         run: ./pok -v
