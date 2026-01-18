@@ -40,13 +40,21 @@ func testCmd() pocket.Runnable {
 			return uv.Run(ctx, opts.PythonVersion, "pytest", args...)
 		}
 
-		// Run with coverage: coverage run -m pytest
-		args := []string{"run", "-m", "pytest"}
+		// Run with coverage: coverage run --parallel-mode -m pytest
+		// --parallel-mode creates .coverage.<hostname>.<pid> files to avoid conflicts
+		// when running multiple test processes in parallel (e.g., TestMatrix)
+		args := []string{"run", "--parallel-mode", "-m", "pytest"}
 		if pocket.Verbose(ctx) {
 			args = append(args, "-vv")
 		}
 		if err := uv.Run(ctx, opts.PythonVersion, "coverage", args...); err != nil {
 			return err
+		}
+
+		// Combine parallel coverage files before reporting
+		if err := uv.Run(ctx, opts.PythonVersion, "coverage", "combine"); err != nil {
+			// Ignore error if no parallel files to combine (single run)
+			pocket.Printf(ctx, "Note: coverage combine skipped (may be single run)\n")
 		}
 
 		// Show coverage report

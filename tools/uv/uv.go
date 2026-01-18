@@ -150,6 +150,12 @@ func Sync(ctx context.Context, pythonVersion string, allGroups bool) error {
 	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
 	cmd := pocket.Command(ctx, Name, args...)
 	cmd.Env = append(cmd.Env, "UV_PROJECT_ENVIRONMENT="+venvPath)
+
+	// Use context output for proper parallel buffering
+	out := pocket.GetOutput(ctx)
+	cmd.Stdout = out.Stdout
+	cmd.Stderr = out.Stderr
+
 	return cmd.Run()
 }
 
@@ -173,6 +179,12 @@ func Run(ctx context.Context, pythonVersion, cmd string, args ...string) error {
 	// Set UV_PROJECT_ENVIRONMENT to use .pocket/venvs/<version>/
 	command := pocket.Command(ctx, Name, uvArgs...)
 	command.Env = append(command.Env, "UV_PROJECT_ENVIRONMENT="+venvPath)
+
+	// Use context output for proper parallel buffering
+	out := pocket.GetOutput(ctx)
+	command.Stdout = out.Stdout
+	command.Stderr = out.Stderr
+
 	return command.Run()
 }
 
