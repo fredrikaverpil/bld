@@ -87,6 +87,12 @@ var Build = pk.NewTask("build", func(ctx context.Context, opts map[string]any) e
 var Test = pk.NewTask("test", func(ctx context.Context, opts map[string]any) error {
 	path := pk.PathFromContext(ctx)
 	fmt.Printf("  [test] in %s: Running tests...\n", path)
+
+	// Example: Using FromGitRoot for file operations (both forms work)
+	// configFile1 := pk.FromGitRoot("services/api", "config.json")
+	// configFile2 := pk.FromGitRoot("services", "api", "config.json")
+	// Both produce: /path/to/repo/services/api/config.json
+
 	// TODO: Run actual tests (e.g., go test)
 	return nil
 })

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 )
 
 // RunCommand executes a command in the directory specified by the context path.
@@ -15,11 +14,8 @@ func RunCommand(ctx context.Context, name string, args ...string) ([]byte, error
 	// Get path from context
 	path := PathFromContext(ctx)
 
-	// Find git root
-	gitRoot := findGitRoot()
-
 	// Construct absolute path to target directory
-	targetDir := filepath.Join(gitRoot, path)
+	targetDir := FromGitRoot(path)
 
 	// Create command
 	cmd := exec.Command(name, args...)
@@ -32,13 +28,6 @@ func RunCommand(ctx context.Context, name string, args ...string) ([]byte, error
 	}
 
 	return output, nil
-}
-
-// RunCommandSilent executes a command and discards output.
-// Returns only the error. Useful for commands where you don't need the output.
-func RunCommandSilent(ctx context.Context, name string, args ...string) error {
-	_, err := RunCommand(ctx, name, args...)
-	return err
 }
 
 // RunCommandString executes a command and returns output as a string.
